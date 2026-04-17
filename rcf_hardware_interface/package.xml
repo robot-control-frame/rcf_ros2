@@ -10,6 +10,8 @@
 
   <depend>control_msgs</depend>
   <depend>rclcpp</depend>
+  <depend>hardware_interface</depend>
+  <depend>controller_interface</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
