@@ -42,6 +42,10 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
+  if (!setup_motors(rcf_std_hardware_config)) {
+    RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup MOTORS FAILURE");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
   if (!setup_imus(rcf_std_hardware_config)) {
     RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup IMU FAILURE");
     return hardware_interface::CallbackReturn::ERROR;
@@ -121,11 +125,26 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_deactivate(
 
 hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& time,
                                                           const rclcpp::Duration& /*period*/) {
-  RCLCPP_INFO(this->get_logger(), "RcfStandardHardware::read");
-  driver_->get_servo_state();
+  // read servo
+  auto servo_status = driver_->get_servo_state();
+  for (auto& item : servo_status) {
+    auto iter = id2act_index_.find(item.id);
+    if (iter != id2act_index_.end()) {
+      auto& act_data = act_data_vector[id2act_index_[item.id]];
+      act_data->status_stamp = item.stamp;
+      act_data->pos = item.position;
+      act_data->pos_raw = item.position;
+      act_data->vel = item.velocity;
+      act_data->effort = item.effort;
+      act_data->cur = item.current;
+      act_data->status = item.error_code;
+      act_data->temperature = item.temperature;
+    } else {
+      RCLCPP_ERROR(get_logger(), "Unknown Motor ID: %d", item.id);
+    }
+  }
 
   auto imu_states = driver_->get_imu_state();
-  RCLCPP_INFO(get_logger(), "RcfStandardHardware read imu states size: %zu", imu_states.size());
   for (auto& item : imu_states) {
     auto iter = id2imu_index_.find(item.id);
     if (iter != id2imu_index_.end()) {
@@ -141,8 +160,6 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
       imu_data->orientation[1] = item.orientation[1];
       imu_data->orientation[2] = item.orientation[2];
       imu_data->orientation[3] = item.orientation[3];
-      RCLCPP_INFO(get_logger(), "RcfStandardHardware read imu:********** %s, id: %d", imu_data->name.c_str(),
-                  imu_data->id);
     } else {
       RCLCPP_ERROR(get_logger(), "Unknown IMU device ID: %d", item.id);
     }
@@ -172,9 +189,44 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
 
 hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /*time*/,
                                                            const rclcpp::Duration& /*period*/) {
-  RCLCPP_INFO(this->get_logger(), "RcfStandardHardware::write");
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
   return hardware_interface::return_type::OK;
+}
+
+bool RcfStandardHardware::setup_motors(YAML::Node& hw_config) {
+  try {
+    auto actuators_config = hw_config["rcf_std_hardware"]["actuators"];
+    size_t act_index = 0;
+    for (auto motor : actuators_config) {
+      std::string name = motor.first.as<std::string>();
+      YAML::Node motor_config = motor.second;
+      uint16_t id = motor_config["id"].as<uint16_t>();
+      auto data = std::make_unique<ActData>();
+      data->name = name;
+      data->id = id;
+      data->type = motor_config["type"].as<std::string>("");
+      data->allow_homing = motor_config["allow_homing"].as<bool>(true);
+      if (data->type == "prismatic") {
+        data->act_type = ActType::STANDARD_PRISMATIC;
+        data->jump_cmd_threshold = motor_config["jump_cmd_threshold"].as<double>(0.002);
+      } else if (data->type == "revolute") {
+        data->act_type = ActType::STANDARD_REVOLUTE;
+        data->jump_cmd_threshold = motor_config["jump_cmd_threshold"].as<double>(0.087);
+      } else {
+        data->act_type = ActType::UNKNOWN;
+      }
+
+      act_data_vector.push_back(std::move(data));
+      id2act_index_.insert(std::make_pair(id, act_index));
+      act_index += 1;
+    }
+
+  } catch (const std::exception& e) {
+    RCLCPP_ERROR(get_logger(), "%s", e.what());
+    return false;
+  }
+  RCLCPP_INFO(get_logger(), "Setup motors success");
+  return true;
 }
 
 bool RcfStandardHardware::setup_imus(YAML::Node& hw_config) {

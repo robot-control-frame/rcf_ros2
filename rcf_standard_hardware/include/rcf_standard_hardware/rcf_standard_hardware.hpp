@@ -64,6 +64,10 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   bool setup_ft_sensors(YAML::Node& hw_config);
   bool setup_check_timeout(YAML::Node& hw_config);
 
+  // motor
+  std::vector<std::unique_ptr<ActData>> act_data_vector;
+  std::unordered_map<uint16_t, size_t> id2act_index_;
+  std::vector<std::unique_ptr<JointData>> joint_data_vector;
   // imu
   std::vector<std::unique_ptr<ImuData>> imus_data_vec_;
   std::unordered_map<uint16_t, size_t> id2imu_index_;
