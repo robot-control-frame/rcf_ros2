@@ -47,6 +47,11 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
+  if (!setup_ft_sensors(rcf_std_hardware_config)) {
+    RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup FT SENSORS FAILURE");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -79,6 +84,15 @@ std::vector<hardware_interface::StateInterface> RcfStandardHardware::export_stat
         hardware_interface::StateInterface(imu->name, "linear_acceleration.y", &imu->linear_accel[1]));
     state_interfaces.emplace_back(
         hardware_interface::StateInterface(imu->name, "linear_acceleration.z", &imu->linear_accel[2]));
+  }
+
+  for (const auto& ft : ft_sensor_data_vec_) {
+    state_interfaces.emplace_back(hardware_interface::StateInterface(ft->name, "force.x", &ft->force[0]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(ft->name, "force.y", &ft->force[1]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(ft->name, "force.z", &ft->force[2]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(ft->name, "torque.x", &ft->torque[0]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(ft->name, "torque.y", &ft->torque[1]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(ft->name, "torque.z", &ft->torque[2]));
   }
   return state_interfaces;
 }
@@ -133,6 +147,26 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
       RCLCPP_ERROR(get_logger(), "Unknown IMU device ID: %d", item.id);
     }
   }
+
+  // read force torque sensors
+  auto ft_status = driver_->get_ft_state();
+  for (auto& item : ft_status) {
+    auto iter = id2ft_index_.find(item.id);
+    if (iter != id2ft_index_.end()) {
+      auto& ft_data = ft_sensor_data_vec_[id2ft_index_[item.id]];
+      ft_data->stamp = item.stamp;
+      ft_data->force[0] = item.force[0];
+      ft_data->force[1] = item.force[1];
+      ft_data->force[2] = item.force[2];
+      ft_data->torque[0] = item.torque[0];
+      ft_data->torque[1] = item.torque[1];
+      ft_data->torque[2] = item.torque[2];
+
+    } else {
+      RCLCPP_ERROR(get_logger(), "Unknown FT device ID: %d", item.id);
+    }
+  }
+
   return hardware_interface::return_type::OK;
 }
 
@@ -164,7 +198,30 @@ bool RcfStandardHardware::setup_imus(YAML::Node& hw_config) {
     RCLCPP_ERROR(get_logger(), "%s", e.what());
     return false;
   }
-  RCLCPP_INFO(get_logger(), "RcfStandardHardware setup imus success");
+  RCLCPP_INFO(get_logger(), "Setup imus sensors success");
+  return true;
+}
+
+bool RcfStandardHardware::setup_ft_sensors(YAML::Node& hw_config) {
+  try {
+    auto fts_config = hw_config["rcf_std_hardware"]["force_torque_sensors"];
+    size_t ft_index = 0;
+    for (auto ft : fts_config) {
+      std::string name = ft.first.as<std::string>();
+      YAML::Node ft_config = ft.second;
+      uint16_t id = ft_config["id"].as<uint16_t>();
+      auto data = std::make_unique<ForceTorqueData>();
+      data->name = name;
+      data->id = id;
+      ft_sensor_data_vec_.push_back(std::move(data));
+      id2ft_index_.insert(std::make_pair(id, ft_index));
+      ft_index += 1;
+    }
+    RCLCPP_INFO(get_logger(), "Setup ft sensors success");
+  } catch (const std::exception& e) {
+    RCLCPP_ERROR(get_logger(), "%s", e.what());
+    return false;
+  }
   return true;
 }
 

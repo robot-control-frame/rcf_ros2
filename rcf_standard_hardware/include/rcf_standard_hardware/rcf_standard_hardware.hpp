@@ -67,6 +67,10 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   // imu
   std::vector<std::unique_ptr<ImuData>> imus_data_vec_;
   std::unordered_map<uint16_t, size_t> id2imu_index_;
+  // ft
+  std::vector<std::unique_ptr<ForceTorqueData>> ft_sensor_data_vec_;
+  std::unordered_map<uint16_t, size_t> id2ft_index_;
+
   // Objects for logging
   std::shared_ptr<rclcpp::Logger> logger_;
   rclcpp::Clock::SharedPtr clock_;
