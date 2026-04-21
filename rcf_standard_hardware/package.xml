@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>rcf_standard_hardware</name>
+  <version>0.0.0</version>
+  <description>Demo package of `ros2_control` standard hardware.</description>
+
+  <maintainer email="liaolunjia@gmail.com">liaolunjia</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>backward_ros</depend>
+  <depend>rcf_hardware_interface</depend>
+  <depend>hardware_interface</depend>
+  <depend>pluginlib</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_lifecycle</depend>
+  <depend>transmission_interface</depend>
+  <depend>rcf_standard_driver_interface</depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

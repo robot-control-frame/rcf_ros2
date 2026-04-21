@@ -1,0 +1,9 @@
+<library path="rcf_standard_hardware">
+  <class name="rcf_standard_hardware/RcfStandardHardware"
+    type="rcf_standard_hardware::RcfStandardHardware"
+    base_class_type="hardware_interface::SystemInterface">
+    <description>
+      The rcf standard hardware interface-type.
+    </description>
+  </class>
+</library>
