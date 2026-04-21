@@ -1,12 +1,15 @@
 
 #pragma once
 
+#include <yaml-cpp/yaml.h>
+
 #include <memory>
 #include <string>
 #include <vector>
 
 // rcf
 #include "rcf_standard_driver_interface/rcf_standard_driver_base.hpp"
+#include "rcf_standard_hardware/type.hpp"
 // ros
 #include "rclcpp/clock.hpp"
 #include "rclcpp/logger.hpp"
@@ -45,15 +48,25 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   /**
    * \return logger of the SystemInterface.
    */
-  rclcpp::Logger get_logger() const { return *logger_; }
+  rclcpp::Logger get_logger() const override { return *logger_; }
 
   /// Get the clock of the SystemInterface.
   /**
    * \return clock of the SystemInterface.
    */
-  rclcpp::Clock::SharedPtr get_clock() const { return clock_; }
+  rclcpp::Clock::SharedPtr get_clock() const override { return clock_; }
 
  private:
+  // set hardware interface
+  bool setup_motors(YAML::Node& hw_config);
+  bool setup_imus(YAML::Node& hw_config);
+  bool setup_transmission(YAML::Node& transmissions_config);
+  bool setup_ft_sensors(YAML::Node& hw_config);
+  bool setup_check_timeout(YAML::Node& hw_config);
+
+  // imu
+  std::vector<std::unique_ptr<ImuData>> imus_data_vec_;
+  std::unordered_map<uint16_t, size_t> id2imu_index_;
   // Objects for logging
   std::shared_ptr<rclcpp::Logger> logger_;
   rclcpp::Clock::SharedPtr clock_;

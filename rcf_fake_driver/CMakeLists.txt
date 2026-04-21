@@ -19,11 +19,15 @@ add_library(${PROJECT_NAME} SHARED src/rcf_fake_driver.cpp)
 target_include_directories(
   ${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
                          $<INSTALL_INTERFACE:include>)
-target_link_libraries(
-  ${PROJECT_NAME} rclcpp::rclcpp yaml-cpp::yaml-cpp)
+target_link_libraries(${PROJECT_NAME} rclcpp::rclcpp yaml-cpp::yaml-cpp)
 ament_target_dependencies(${PROJECT_NAME} pluginlib rcf_standard_driver_interface)
 
 install(DIRECTORY include/ DESTINATION include)
+install(
+  TARGETS ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin)
 pluginlib_export_plugin_description_file(rcf_standard_driver_interface plugins.xml)
 
 ament_package()
