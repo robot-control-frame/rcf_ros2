@@ -57,7 +57,7 @@ struct ImuData {
   uint16_t id;
   rclcpp::Time stamp;
   uint64_t seq;
-  double orientation[4], angular_vel[3], linear_accel[3], rpy[3];
+  double orientation[4], angular_vel[3], linear_accel[3];
   double orientation_covariance[3], angular_velocity_covariance[3], linear_acceleration_covariance[3];
   rclcpp::Time last_timeout_print_stamp{};
 };

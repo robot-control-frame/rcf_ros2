@@ -15,6 +15,7 @@ bool RcfFakeDriver::init(std::vector<std::string> config) {
     auto actuators_config = hw_config["rcf_std_hardware"]["actuators"];
     for (auto motor : actuators_config) {
       std::string name = motor.first.as<std::string>();
+      RCLCPP_INFO(get_logger(), "RcfFakeDriver init motor: %s", name.c_str());
       YAML::Node motor_config = motor.second;
       uint16_t id = motor_config["id"].as<uint16_t>();
       RCLCPP_INFO(get_logger(), "RcfFakeDriver init motor: %s, id: %d", name.c_str(), id);
@@ -155,6 +156,7 @@ std::vector<rcf_standard_driver_interface::ForceTorque> RcfFakeDriver::get_ft_st
 
 std::vector<rcf_standard_driver_interface::Imu> RcfFakeDriver::get_imu_state() {
   std::lock_guard<std::mutex> lock(imu_state_mutex_);
+  RCLCPP_INFO(get_logger(), "RcfFakeDriver::get_imu_state imu states size: %zu", imu_states_.size());
   return imu_states_;
 }
 

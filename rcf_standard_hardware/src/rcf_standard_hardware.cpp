@@ -21,7 +21,7 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     rcf_std_hardware_config_path_ = info_.hardware_parameters["rcf_std_hardware_config_path"];
     RCLCPP_INFO(get_logger(), "rcf_std_hardware_config_path: %s", rcf_std_hardware_config_path_.c_str());
 
-    // rcf_std_hardware_config = YAML::LoadFile(rcf_std_hardware_config_path_);
+    rcf_std_hardware_config = YAML::LoadFile(rcf_std_hardware_config_path_);
 
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "Exception while reading the YAML file: %s", e.what());
@@ -34,7 +34,7 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
   try {
     driver_ = driver_loader.createSharedInstance("rcf_fake_driver/RcfFakeDriver");
     std::vector<std::string> driver_config;
-    driver_config.push_back(transmissions_config_path_);
+    driver_config.push_back(rcf_std_hardware_config_path_);
 
     driver_->init(driver_config);
   } catch (pluginlib::PluginlibException& ex) {
@@ -42,10 +42,10 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     return hardware_interface::CallbackReturn::ERROR;
   }
 
-  // if (!setup_imus(rcf_std_hardware_config)) {
-  //   RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup IMU FAILURE");
-  //   return hardware_interface::CallbackReturn::ERROR;
-  // }
+  if (!setup_imus(rcf_std_hardware_config)) {
+    RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup IMU FAILURE");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -62,7 +62,24 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_configure(
 std::vector<hardware_interface::StateInterface> RcfStandardHardware::export_state_interfaces() {
   RCLCPP_INFO(get_logger(), "RcfStandardHardware::export_state_interfaces");
   std::vector<hardware_interface::StateInterface> state_interfaces;
-
+  for (const auto& imu : imus_data_vec_) {
+    state_interfaces.emplace_back(hardware_interface::StateInterface(imu->name, "orientation.x", &imu->orientation[0]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(imu->name, "orientation.y", &imu->orientation[1]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(imu->name, "orientation.z", &imu->orientation[2]));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(imu->name, "orientation.w", &imu->orientation[3]));
+    state_interfaces.emplace_back(
+        hardware_interface::StateInterface(imu->name, "angular_velocity.x", &imu->angular_vel[0]));
+    state_interfaces.emplace_back(
+        hardware_interface::StateInterface(imu->name, "angular_velocity.y", &imu->angular_vel[1]));
+    state_interfaces.emplace_back(
+        hardware_interface::StateInterface(imu->name, "angular_velocity.z", &imu->angular_vel[2]));
+    state_interfaces.emplace_back(
+        hardware_interface::StateInterface(imu->name, "linear_acceleration.x", &imu->linear_accel[0]));
+    state_interfaces.emplace_back(
+        hardware_interface::StateInterface(imu->name, "linear_acceleration.y", &imu->linear_accel[1]));
+    state_interfaces.emplace_back(
+        hardware_interface::StateInterface(imu->name, "linear_acceleration.z", &imu->linear_accel[2]));
+  }
   return state_interfaces;
 }
 
@@ -92,6 +109,30 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
                                                           const rclcpp::Duration& /*period*/) {
   RCLCPP_INFO(this->get_logger(), "RcfStandardHardware::read");
   driver_->get_servo_state();
+
+  auto imu_states = driver_->get_imu_state();
+  RCLCPP_INFO(get_logger(), "RcfStandardHardware read imu states size: %zu", imu_states.size());
+  for (auto& item : imu_states) {
+    auto iter = id2imu_index_.find(item.id);
+    if (iter != id2imu_index_.end()) {
+      auto& imu_data = imus_data_vec_[id2imu_index_[item.id]];
+      imu_data->stamp = item.stamp;
+      imu_data->angular_vel[0] = item.angular_velocity[0];
+      imu_data->angular_vel[1] = item.angular_velocity[1];
+      imu_data->angular_vel[2] = item.angular_velocity[2];
+      imu_data->linear_accel[0] = item.linear_acceleration[0];
+      imu_data->linear_accel[1] = item.linear_acceleration[1];
+      imu_data->linear_accel[2] = item.linear_acceleration[2];
+      imu_data->orientation[0] = item.orientation[0];
+      imu_data->orientation[1] = item.orientation[1];
+      imu_data->orientation[2] = item.orientation[2];
+      imu_data->orientation[3] = item.orientation[3];
+      RCLCPP_INFO(get_logger(), "RcfStandardHardware read imu:********** %s, id: %d", imu_data->name.c_str(),
+                  imu_data->id);
+    } else {
+      RCLCPP_ERROR(get_logger(), "Unknown IMU device ID: %d", item.id);
+    }
+  }
   return hardware_interface::return_type::OK;
 }
 
@@ -104,7 +145,7 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
 
 bool RcfStandardHardware::setup_imus(YAML::Node& hw_config) {
   try {
-    auto imus_config = hw_config["standard_hardware"]["imus"];
+    auto imus_config = hw_config["rcf_std_hardware"]["imus"];
 
     size_t imu_index = 0;
     for (auto imu : imus_config) {
@@ -115,11 +156,6 @@ bool RcfStandardHardware::setup_imus(YAML::Node& hw_config) {
       data->name = name;
       RCLCPP_INFO(get_logger(), "RcfStandardHardware setup imu: %s, id: %d", name.c_str(), id);
       data->id = id;
-      // hardware_interface::ImuSensorHandle imu_handle(
-      //     data->name, data->name, data->orientation, data->orientation_covariance, data->angular_vel,
-      //     data->angular_velocity_covariance, data->linear_accel, data->linear_acceleration_covariance, data->rpy);
-      // imu_sensor_interface_.registerHandle(imu_handle);
-
       imus_data_vec_.push_back(std::move(data));
       id2imu_index_.insert(std::make_pair(id, imu_index));
       imu_index += 1;
@@ -128,6 +164,7 @@ bool RcfStandardHardware::setup_imus(YAML::Node& hw_config) {
     RCLCPP_ERROR(get_logger(), "%s", e.what());
     return false;
   }
+  RCLCPP_INFO(get_logger(), "RcfStandardHardware setup imus success");
   return true;
 }
 
