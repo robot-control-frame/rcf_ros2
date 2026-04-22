@@ -18,9 +18,9 @@ class JointCommandHandle {
  public:
   explicit JointCommandHandle(const std::string& joint_name) : joint_name_(joint_name) {
     interface_names_.push_back(joint_name + "/control_mode");
-    interface_names_.push_back(joint_name + "/position");
-    interface_names_.push_back(joint_name + "/velocity");
-    interface_names_.push_back(joint_name + "/effort");
+    interface_names_.push_back(joint_name + "/cmd_position");
+    interface_names_.push_back(joint_name + "/cmd_velocity");
+    interface_names_.push_back(joint_name + "/cmd_effort");
     interface_names_.push_back(joint_name + "/cmd_v1");
     interface_names_.push_back(joint_name + "/cmd_v2");
     interface_names_.push_back(joint_name + "/cmd_v3");

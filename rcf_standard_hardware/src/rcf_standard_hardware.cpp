@@ -1,6 +1,7 @@
 #include "rcf_standard_hardware/rcf_standard_hardware.hpp"
 
 #include <cmath>
+#include <hardware_interface/hardware_info.hpp>
 #include <memory>
 #include <string>
 #include <vector>
@@ -22,7 +23,7 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     RCLCPP_INFO(get_logger(), "rcf_std_hardware_config_path: %s", rcf_std_hardware_config_path_.c_str());
 
     rcf_std_hardware_config = YAML::LoadFile(rcf_std_hardware_config_path_);
-
+    transmissions_config = YAML::LoadFile(transmissions_config_path_);
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "Exception while reading the YAML file: %s", e.what());
     return hardware_interface::CallbackReturn::ERROR;
@@ -46,11 +47,14 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup MOTORS FAILURE");
     return hardware_interface::CallbackReturn::ERROR;
   }
+  if (!setup_transmission(transmissions_config)) {
+    RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup TRANSMISSION FAILURE");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
   if (!setup_imus(rcf_std_hardware_config)) {
     RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup IMU FAILURE");
     return hardware_interface::CallbackReturn::ERROR;
   }
-
   if (!setup_ft_sensors(rcf_std_hardware_config)) {
     RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup FT SENSORS FAILURE");
     return hardware_interface::CallbackReturn::ERROR;
@@ -71,6 +75,13 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_configure(
 std::vector<hardware_interface::StateInterface> RcfStandardHardware::export_state_interfaces() {
   RCLCPP_INFO(get_logger(), "RcfStandardHardware::export_state_interfaces");
   std::vector<hardware_interface::StateInterface> state_interfaces;
+
+  for (const auto& joint : joint_data_vector) {
+    state_interfaces.emplace_back(hardware_interface::StateInterface(joint->name, "position", &joint->position));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(joint->name, "velocity", &joint->velocity));
+    state_interfaces.emplace_back(hardware_interface::StateInterface(joint->name, "effort", &joint->effort));
+  }
+
   for (const auto& imu : imus_data_vec_) {
     state_interfaces.emplace_back(hardware_interface::StateInterface(imu->name, "orientation.x", &imu->orientation[0]));
     state_interfaces.emplace_back(hardware_interface::StateInterface(imu->name, "orientation.y", &imu->orientation[1]));
@@ -142,6 +153,10 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
     } else {
       RCLCPP_ERROR(get_logger(), "Unknown Motor ID: %d", item.id);
     }
+  }
+
+  for (auto& transmission : transmissions_) {
+    transmission->actuator_to_joint();
   }
 
   auto imu_states = driver_->get_imu_state();
@@ -229,6 +244,96 @@ bool RcfStandardHardware::setup_motors(YAML::Node& hw_config) {
   return true;
 }
 
+bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
+  auto rcf_simple_transmission_loader = rcf_transmission_interface::RcfSimpleTransmissionLoader();
+
+  try {
+    auto transmissions_data = transmissions_config["transmissions"];
+    for (auto trans : transmissions_data) {
+      std::shared_ptr<transmission_interface::Transmission> transmission;
+      std::string name = trans.first.as<std::string>();
+      YAML::Node trans_config = trans.second;
+      std::string type = trans_config["type"].as<std::string>();
+      if (type == "SimpleTransmission" or type == "simple_transmission") {
+        hardware_interface::TransmissionInfo transmission_info;
+        transmission_info.name = name;
+        transmission_info.type = type;
+
+        hardware_interface::JointInfo joint_info;
+        YAML::Node trans_joint_config = trans_config["joint"];
+        joint_info.name = trans_joint_config["name"].as<std::string>();
+        joint_info.offset = trans_joint_config["offset"].as<double>(0.0);
+        transmission_info.joints.push_back(joint_info);
+        hardware_interface::ActuatorInfo act_info;
+        YAML::Node trans_act_config = trans_config["actuator"];
+        act_info.name = trans_act_config["name"].as<std::string>();
+
+        auto act_data_iter = std::find_if(act_data_vector.begin(), act_data_vector.end(),
+                                          [act_info](const std::shared_ptr<ActData>& ptr) {
+                                            // 重要：检查指针是否为空
+                                            if (!ptr) return false;
+                                            return ptr->name == act_info.name;
+                                          });
+
+        if (act_data_iter != act_data_vector.end()) {
+          RCLCPP_INFO(get_logger(), "Found actuator: %s", act_info.name.c_str());
+        } else {
+          RCLCPP_ERROR(get_logger(), "Unknown actuator: %s", act_info.name.c_str());
+          return false;
+        }
+
+        act_info.mechanical_reduction = trans_act_config["mechanical_reduction"].as<double>(1.0);
+        transmission_info.actuators.push_back(act_info);
+        transmission = rcf_simple_transmission_loader.load(transmission_info);
+
+        std::vector<transmission_interface::JointHandle> joint_handles;
+        std::vector<transmission_interface::ActuatorHandle> actuator_handles;
+        auto joint_interface_data = std::make_shared<JointData>();
+        joint_interface_data->name = joint_info.name;
+        joint_interface_data->position = 0.0;
+        joint_interface_data->velocity = 0.0;
+        joint_interface_data->effort = 0.0;
+        joint_interface_data->control_mode = rcf_hardware_interface::ControlModes::BEGIN;
+        joint_interface_data->position_command = 0.0;
+        joint_interface_data->velocity_command = 0.0;
+        joint_interface_data->effort_command = 0.0;
+        joint_interface_data->v1 = 0.0;
+        joint_interface_data->v2 = 0.0;
+        joint_interface_data->v3 = 0.0;
+        joint_data_vector.push_back(joint_interface_data);
+        transmission_interface::JointHandle joint_state_pos_handle(joint_info.name, "position",
+                                                                   &joint_interface_data->position);
+        transmission_interface::JointHandle joint_state_vel_handle(joint_info.name, "velocity",
+                                                                   &joint_interface_data->velocity);
+        transmission_interface::JointHandle joint_state_eff_handle(joint_info.name, "effort",
+                                                                   &joint_interface_data->effort);
+        joint_handles.push_back(joint_state_pos_handle);
+        joint_handles.push_back(joint_state_vel_handle);
+        joint_handles.push_back(joint_state_eff_handle);
+
+        transmission_interface::ActuatorHandle actuator_state_pos_handle(act_info.name, "position",
+                                                                         &(act_data_iter->get()->pos));
+        transmission_interface::ActuatorHandle actuator_state_vel_handle(act_info.name, "velocity",
+                                                                         &(act_data_iter->get()->vel));
+        transmission_interface::ActuatorHandle actuator_state_eff_handle(act_info.name, "effort",
+                                                                         &(act_data_iter->get()->effort));
+        actuator_handles.push_back(actuator_state_pos_handle);
+        actuator_handles.push_back(actuator_state_vel_handle);
+        actuator_handles.push_back(actuator_state_eff_handle);
+        transmission->configure(joint_handles, actuator_handles);
+        // RCLCPP_INFO(get_logger(), "Setup transmission: %s %s %f %f", joint_info.name.c_str(), act_info.name.c_str(),
+        // act_info.mechanical_reduction, joint_info.offset);
+      }
+      transmissions_.push_back(transmission);
+      RCLCPP_INFO(get_logger(), "Setup transmission: %s %s", name.c_str(), type.c_str());
+    }
+  } catch (const std::exception& e) {
+    RCLCPP_ERROR(get_logger(), "%s", e.what());
+    return false;
+  }
+  return true;
+}
+
 bool RcfStandardHardware::setup_imus(YAML::Node& hw_config) {
   try {
     auto imus_config = hw_config["rcf_std_hardware"]["imus"];
@@ -238,11 +343,10 @@ bool RcfStandardHardware::setup_imus(YAML::Node& hw_config) {
       std::string name = imu.first.as<std::string>();
       YAML::Node imu_config = imu.second;
       uint16_t id = imu_config["id"].as<uint16_t>();
-      auto data = std::make_unique<rcf_standard_hardware::ImuData>();
+      auto data = std::make_shared<rcf_standard_hardware::ImuData>();
       data->name = name;
-      RCLCPP_INFO(get_logger(), "RcfStandardHardware setup imu: %s, id: %d", name.c_str(), id);
       data->id = id;
-      imus_data_vec_.push_back(std::move(data));
+      imus_data_vec_.push_back(data);
       id2imu_index_.insert(std::make_pair(id, imu_index));
       imu_index += 1;
     }
@@ -262,10 +366,10 @@ bool RcfStandardHardware::setup_ft_sensors(YAML::Node& hw_config) {
       std::string name = ft.first.as<std::string>();
       YAML::Node ft_config = ft.second;
       uint16_t id = ft_config["id"].as<uint16_t>();
-      auto data = std::make_unique<ForceTorqueData>();
+      auto data = std::make_shared<ForceTorqueData>();
       data->name = name;
       data->id = id;
-      ft_sensor_data_vec_.push_back(std::move(data));
+      ft_sensor_data_vec_.push_back(data);
       id2ft_index_.insert(std::make_pair(id, ft_index));
       ft_index += 1;
     }

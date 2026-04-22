@@ -15,6 +15,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
     rcf_hardware_interface
     rcf_standard_driver_interface
     transmission_interface
+    rcf_transmission_interface
     yaml-cpp)
 
 # find dependencies

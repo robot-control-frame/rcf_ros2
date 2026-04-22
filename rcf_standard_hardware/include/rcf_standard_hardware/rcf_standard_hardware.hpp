@@ -8,8 +8,11 @@
 #include <vector>
 
 // rcf
+#include "rcf_hardware_interface/control_modes.hpp"
 #include "rcf_standard_driver_interface/rcf_standard_driver_base.hpp"
 #include "rcf_standard_hardware/type.hpp"
+#include "rcf_transmission_interface/rcf_simple_transmission.hpp"
+#include "rcf_transmission_interface/rcf_simple_transmission_loader.hpp"
 // ros
 #include "rclcpp/clock.hpp"
 #include "rclcpp/logger.hpp"
@@ -21,6 +24,7 @@
 #include "hardware_interface/handle.hpp"
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
+#include "transmission_interface/transmission.hpp"
 
 namespace rcf_standard_hardware {
 class RcfStandardHardware : public hardware_interface::SystemInterface {
@@ -65,14 +69,14 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   bool setup_check_timeout(YAML::Node& hw_config);
 
   // motor
-  std::vector<std::unique_ptr<ActData>> act_data_vector;
+  std::vector<std::shared_ptr<ActData>> act_data_vector;
   std::unordered_map<uint16_t, size_t> id2act_index_;
-  std::vector<std::unique_ptr<JointData>> joint_data_vector;
+  std::vector<std::shared_ptr<JointData>> joint_data_vector;
   // imu
-  std::vector<std::unique_ptr<ImuData>> imus_data_vec_;
+  std::vector<std::shared_ptr<ImuData>> imus_data_vec_;
   std::unordered_map<uint16_t, size_t> id2imu_index_;
   // ft
-  std::vector<std::unique_ptr<ForceTorqueData>> ft_sensor_data_vec_;
+  std::vector<std::shared_ptr<ForceTorqueData>> ft_sensor_data_vec_;
   std::unordered_map<uint16_t, size_t> id2ft_index_;
 
   // Objects for logging
@@ -83,6 +87,9 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   std::string rcf_std_hardware_config_path_;
   bool hw_debug_{false};
   std::shared_ptr<rcf_standard_driver_interface::RcfStandardDriverBase> driver_;
+
+  // ros2_control
+  std::vector<std::shared_ptr<transmission_interface::Transmission>> transmissions_;
 };
 
 }  // namespace rcf_standard_hardware

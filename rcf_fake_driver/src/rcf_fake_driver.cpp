@@ -88,7 +88,8 @@ void RcfFakeDriver::update() {
     // 理想响应
     for (auto& pair : id2servo_commands_) {
       id2servo_states_[pair.first].stamp = get_clock().now();
-      id2servo_states_[pair.first].position = pair.second.position;
+      // id2servo_states_[pair.first].position = pair.second.position;
+      id2servo_states_[pair.first].position = sin(get_clock().now().seconds());
       id2servo_states_[pair.first].velocity = pair.second.velocity;
       id2servo_states_[pair.first].effort = pair.second.effort;
     }
