@@ -11,8 +11,7 @@
 #include "rcf_hardware_interface/control_modes.hpp"
 #include "rcf_standard_driver_interface/rcf_standard_driver_base.hpp"
 #include "rcf_standard_hardware/type.hpp"
-#include "rcf_transmission_interface/rcf_simple_transmission.hpp"
-#include "rcf_transmission_interface/rcf_simple_transmission_loader.hpp"
+
 // ros
 #include "rclcpp/clock.hpp"
 #include "rclcpp/logger.hpp"

@@ -9,7 +9,6 @@
 #include <string>
 #include <vector>
 
-#include "hardware_interface/types/hardware_interface_type_values.hpp"
 #include "transmission_interface/exception.hpp"
 #include "transmission_interface/transmission.hpp"
 namespace rcf_transmission_interface {
@@ -140,8 +139,17 @@ inline void RcfSimpleTransmission::configure(
   state_joint_position_ = get_by_interface(joint_handles, "position");
   state_joint_velocity_ = get_by_interface(joint_handles, "velocity");
   state_joint_effort_ = get_by_interface(joint_handles, "effort");
+  cmd_joint_control_mode_ = get_by_interface(joint_handles, "control_mode");
+  cmd_joint_position_ = get_by_interface(joint_handles, "cmd_position");
+  cmd_joint_velocity_ = get_by_interface(joint_handles, "cmd_velocity");
+  cmd_joint_effort_ = get_by_interface(joint_handles, "cmd_effort");
+  cmd_joint_v1_ = get_by_interface(joint_handles, "cmd_v1");
+  cmd_joint_v2_ = get_by_interface(joint_handles, "cmd_v2");
+  cmd_joint_v3_ = get_by_interface(joint_handles, "cmd_v3");
 
-  if (!state_joint_position_ && !state_joint_velocity_ && !state_joint_effort_) {
+  if (!state_joint_position_ && !state_joint_velocity_ && !state_joint_effort_ && !cmd_joint_control_mode_ &&
+      !cmd_joint_position_ && !cmd_joint_velocity_ && !cmd_joint_effort_ && !cmd_joint_v1_ && !cmd_joint_v2_ &&
+      !cmd_joint_v3_) {
     throw transmission_interface::Exception(
         "None of the provided joint handles are valid or from the required interfaces");
   }
@@ -149,8 +157,17 @@ inline void RcfSimpleTransmission::configure(
   state_actuator_position_ = get_by_interface(actuator_handles, "position");
   state_actuator_velocity_ = get_by_interface(actuator_handles, "velocity");
   state_actuator_effort_ = get_by_interface(actuator_handles, "effort");
+  cmd_actuator_control_mode_ = get_by_interface(actuator_handles, "control_mode");
+  cmd_actuator_position_ = get_by_interface(actuator_handles, "cmd_position");
+  cmd_actuator_velocity_ = get_by_interface(actuator_handles, "cmd_velocity");
+  cmd_actuator_effort_ = get_by_interface(actuator_handles, "cmd_effort");
+  cmd_actuator_v1_ = get_by_interface(actuator_handles, "cmd_v1");
+  cmd_actuator_v2_ = get_by_interface(actuator_handles, "cmd_v2");
+  cmd_actuator_v3_ = get_by_interface(actuator_handles, "cmd_v3");
 
-  if (!state_actuator_position_ && !state_actuator_velocity_ && !state_actuator_effort_) {
+  if (!state_actuator_position_ && !state_actuator_velocity_ && !state_actuator_effort_ &&
+      !cmd_actuator_control_mode_ && !cmd_actuator_position_ && !cmd_actuator_velocity_ && !cmd_actuator_effort_ &&
+      !cmd_actuator_v1_ && !cmd_actuator_v2_ && !cmd_actuator_v3_) {
     throw transmission_interface::Exception(
         "None of the provided actuator handles are valid or from the required interfaces");
   }

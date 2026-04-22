@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "rcf_transmission_interface/rcf_simple_transmission_loader.hpp"
+
 namespace rcf_standard_hardware {
 hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     const hardware_interface::HardwareComponentInterfaceParams& params) {
@@ -116,6 +118,20 @@ std::vector<hardware_interface::CommandInterface> RcfStandardHardware::export_co
   RCLCPP_INFO(get_logger(), "RcfStandardHardware::export_command_interfaces");
   std::vector<hardware_interface::CommandInterface> command_interfaces;
 
+  for (const auto& joint : joint_data_vector) {
+    command_interfaces.emplace_back(
+        hardware_interface::CommandInterface(joint->name, "control_mode", &joint->control_mode));
+    command_interfaces.emplace_back(
+        hardware_interface::CommandInterface(joint->name, "cmd_position", &joint->position_command));
+    command_interfaces.emplace_back(
+        hardware_interface::CommandInterface(joint->name, "cmd_velocity", &joint->velocity_command));
+    command_interfaces.emplace_back(
+        hardware_interface::CommandInterface(joint->name, "cmd_effort", &joint->effort_command));
+    command_interfaces.emplace_back(hardware_interface::CommandInterface(joint->name, "cmd_v1", &joint->v1));
+    command_interfaces.emplace_back(hardware_interface::CommandInterface(joint->name, "cmd_v2", &joint->v2));
+    command_interfaces.emplace_back(hardware_interface::CommandInterface(joint->name, "cmd_v3", &joint->v3));
+  }
+
   return command_interfaces;
 }
 
@@ -205,6 +221,10 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
 hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /*time*/,
                                                            const rclcpp::Duration& /*period*/) {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
+  for (auto& transmission : transmissions_) {
+    transmission->joint_to_actuator();
+  }
+
   return hardware_interface::return_type::OK;
 }
 
@@ -270,7 +290,6 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
 
         auto act_data_iter = std::find_if(act_data_vector.begin(), act_data_vector.end(),
                                           [act_info](const std::shared_ptr<ActData>& ptr) {
-                                            // 重要：检查指针是否为空
                                             if (!ptr) return false;
                                             return ptr->name == act_info.name;
                                           });
@@ -307,9 +326,27 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
                                                                    &joint_interface_data->velocity);
         transmission_interface::JointHandle joint_state_eff_handle(joint_info.name, "effort",
                                                                    &joint_interface_data->effort);
+        transmission_interface::JointHandle joint_control_mode_handle(joint_info.name, "control_mode",
+                                                                      &joint_interface_data->control_mode);
+        transmission_interface::JointHandle joint_cmd_pos_handle(joint_info.name, "cmd_position",
+                                                                 &joint_interface_data->position_command);
+        transmission_interface::JointHandle joint_cmd_vel_handle(joint_info.name, "cmd_velocity",
+                                                                 &joint_interface_data->velocity_command);
+        transmission_interface::JointHandle joint_cmd_eff_handle(joint_info.name, "cmd_effort",
+                                                                 &joint_interface_data->effort_command);
+        transmission_interface::JointHandle joint_cmd_v1_handle(joint_info.name, "cmd_v1", &joint_interface_data->v1);
+        transmission_interface::JointHandle joint_cmd_v2_handle(joint_info.name, "cmd_v2", &joint_interface_data->v2);
+        transmission_interface::JointHandle joint_cmd_v3_handle(joint_info.name, "cmd_v3", &joint_interface_data->v3);
         joint_handles.push_back(joint_state_pos_handle);
         joint_handles.push_back(joint_state_vel_handle);
         joint_handles.push_back(joint_state_eff_handle);
+        joint_handles.push_back(joint_control_mode_handle);
+        joint_handles.push_back(joint_cmd_pos_handle);
+        joint_handles.push_back(joint_cmd_vel_handle);
+        joint_handles.push_back(joint_cmd_eff_handle);
+        joint_handles.push_back(joint_cmd_v1_handle);
+        joint_handles.push_back(joint_cmd_v2_handle);
+        joint_handles.push_back(joint_cmd_v3_handle);
 
         transmission_interface::ActuatorHandle actuator_state_pos_handle(act_info.name, "position",
                                                                          &(act_data_iter->get()->pos));
@@ -317,9 +354,30 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
                                                                          &(act_data_iter->get()->vel));
         transmission_interface::ActuatorHandle actuator_state_eff_handle(act_info.name, "effort",
                                                                          &(act_data_iter->get()->effort));
+        transmission_interface::ActuatorHandle actuator_cmd_control_mode_handle(act_info.name, "control_mode",
+                                                                                &(act_data_iter->get()->ctrl_mode));
+        transmission_interface::ActuatorHandle actuator_cmd_pos_handle(act_info.name, "cmd_position",
+                                                                       &(act_data_iter->get()->cmd_pos));
+        transmission_interface::ActuatorHandle actuator_cmd_vel_handle(act_info.name, "cmd_velocity",
+                                                                       &(act_data_iter->get()->cmd_vel));
+        transmission_interface::ActuatorHandle actuator_cmd_eff_handle(act_info.name, "cmd_effort",
+                                                                       &(act_data_iter->get()->cmd_effort));
+        transmission_interface::ActuatorHandle actuator_cmd_v1_handle(act_info.name, "cmd_v1",
+                                                                      &(act_data_iter->get()->cmd_v1));
+        transmission_interface::ActuatorHandle actuator_cmd_v2_handle(act_info.name, "cmd_velocity",
+                                                                      &(act_data_iter->get()->cmd_v2));
+        transmission_interface::ActuatorHandle actuator_cmd_v3_handle(act_info.name, "cmd_v3",
+                                                                      &(act_data_iter->get()->cmd_v3));
         actuator_handles.push_back(actuator_state_pos_handle);
         actuator_handles.push_back(actuator_state_vel_handle);
         actuator_handles.push_back(actuator_state_eff_handle);
+        actuator_handles.push_back(actuator_cmd_control_mode_handle);
+        actuator_handles.push_back(actuator_cmd_pos_handle);
+        actuator_handles.push_back(actuator_cmd_vel_handle);
+        actuator_handles.push_back(actuator_cmd_eff_handle);
+        actuator_handles.push_back(actuator_cmd_v1_handle);
+        actuator_handles.push_back(actuator_cmd_v2_handle);
+        actuator_handles.push_back(actuator_cmd_v3_handle);
         transmission->configure(joint_handles, actuator_handles);
         // RCLCPP_INFO(get_logger(), "Setup transmission: %s %s %f %f", joint_info.name.c_str(), act_info.name.c_str(),
         // act_info.mechanical_reduction, joint_info.offset);
