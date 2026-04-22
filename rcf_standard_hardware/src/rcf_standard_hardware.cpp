@@ -13,6 +13,7 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     const hardware_interface::HardwareComponentInterfaceParams& params) {
   logger_ = std::make_shared<rclcpp::Logger>(rclcpp::get_logger("RcfStandardHardware"));
   clock_ = std::make_shared<rclcpp::Clock>(rclcpp::Clock());
+
   RCLCPP_INFO(get_logger(), "RcfStandardHardware::on_init");
   if (hardware_interface::SystemInterface::on_init(params) != hardware_interface::CallbackReturn::SUCCESS) {
     return hardware_interface::CallbackReturn::ERROR;
@@ -67,7 +68,11 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
 
 hardware_interface::CallbackReturn RcfStandardHardware::on_configure(
     const rclcpp_lifecycle::State& /*previous_state*/) {
-  RCLCPP_INFO(get_logger(), "RcfStandardHardware::on_configure.");
+  dynamic_actuator_state_publisher_ = get_node()->create_publisher<control_msgs::msg::DynamicJointState>(
+      get_name() + "/actuator_states", rclcpp::SystemDefaultsQoS());
+  realtime_dynamic_actuator_state_publisher_ =
+      std::make_shared<realtime_tools::RealtimePublisher<control_msgs::msg::DynamicJointState>>(
+          dynamic_actuator_state_publisher_);
 
   RCLCPP_INFO(get_logger(), "Configuration successful");
   driver_->starting();
@@ -138,6 +143,7 @@ std::vector<hardware_interface::CommandInterface> RcfStandardHardware::export_co
 hardware_interface::CallbackReturn RcfStandardHardware::on_activate(const rclcpp_lifecycle::State& /*previous_state*/) {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
   RCLCPP_INFO(get_logger(), "RcfStandardHardware::on_activate.");
+  init_dynamic_actuator_state_msg();
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -225,6 +231,26 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
     transmission->joint_to_actuator();
   }
 
+  dynamic_actuator_state_msg_.header.stamp = get_clock()->now();
+  for (size_t i = 0; i < act_data_vector.size(); i++) {
+    auto& act_data = act_data_vector[i];
+    dynamic_actuator_state_msg_.interface_values[i].values[0] = act_data->pos_raw;
+    dynamic_actuator_state_msg_.interface_values[i].values[1] = act_data->q_circle;
+    dynamic_actuator_state_msg_.interface_values[i].values[2] = act_data->pos;
+    dynamic_actuator_state_msg_.interface_values[i].values[3] = act_data->vel;
+    dynamic_actuator_state_msg_.interface_values[i].values[4] = act_data->effort;
+    dynamic_actuator_state_msg_.interface_values[i].values[5] = act_data->ctrl_mode;
+    dynamic_actuator_state_msg_.interface_values[i].values[6] = act_data->cmd_pos;
+    dynamic_actuator_state_msg_.interface_values[i].values[7] = act_data->cmd_vel;
+    dynamic_actuator_state_msg_.interface_values[i].values[8] = act_data->cmd_effort;
+    dynamic_actuator_state_msg_.interface_values[i].values[9] = act_data->cmd_v1;
+    dynamic_actuator_state_msg_.interface_values[i].values[10] = act_data->cmd_v2;
+    dynamic_actuator_state_msg_.interface_values[i].values[11] = act_data->cmd_v3;
+    dynamic_actuator_state_msg_.interface_values[i].values[12] = act_data->cur;
+    dynamic_actuator_state_msg_.interface_values[i].values[13] = act_data->status;
+    dynamic_actuator_state_msg_.interface_values[i].values[14] = act_data->temperature;
+  }
+  realtime_dynamic_actuator_state_publisher_->try_publish(dynamic_actuator_state_msg_);
   return hardware_interface::return_type::OK;
 }
 
@@ -439,6 +465,47 @@ bool RcfStandardHardware::setup_ft_sensors(YAML::Node& hw_config) {
   return true;
 }
 
+void RcfStandardHardware::init_dynamic_actuator_state_msg() {
+  dynamic_actuator_state_msg_.header.frame_id = "RcfStandardHardware";
+  dynamic_actuator_state_msg_.joint_names.clear();
+  dynamic_actuator_state_msg_.interface_values.clear();
+
+  for (const auto& act_data : act_data_vector) {
+    dynamic_actuator_state_msg_.joint_names.push_back(act_data->name);
+    control_msgs::msg::InterfaceValue if_value;
+    if_value.interface_names.emplace_back("position_raw");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("circle");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("position");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("velocity");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("effort");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("control_mode");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("cmd_position");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("cmd_velocity");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("cmd_effort");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("cmd_v1");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("cmd_v2");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("cmd_v3");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("current");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("status");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    if_value.interface_names.emplace_back("temperature");
+    if_value.values.emplace_back(std::numeric_limits<double>::quiet_NaN());
+    dynamic_actuator_state_msg_.interface_values.emplace_back(if_value);
+  }
+}
 }  // namespace rcf_standard_hardware
 
 #include "pluginlib/class_list_macros.hpp"

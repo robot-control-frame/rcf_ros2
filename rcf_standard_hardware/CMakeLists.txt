@@ -16,7 +16,9 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
     rcf_standard_driver_interface
     transmission_interface
     rcf_transmission_interface
-    yaml-cpp)
+    yaml-cpp
+    realtime_tools
+    control_msgs)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -26,7 +28,8 @@ endforeach()
 
 # COMPILE
 add_library(rcf_standard_hardware SHARED src/rcf_standard_hardware.cpp)
-target_link_libraries(${PROJECT_NAME} PUBLIC rclcpp::rclcpp yaml-cpp::yaml-cpp)
+target_link_libraries(${PROJECT_NAME} PUBLIC rclcpp::rclcpp yaml-cpp::yaml-cpp
+                                             realtime_tools::realtime_tools)
 target_include_directories(
   rcf_standard_hardware
   PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>

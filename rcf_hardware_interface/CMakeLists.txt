@@ -18,9 +18,12 @@ add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(
   ${PROJECT_NAME} INTERFACE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
                             $<INSTALL_INTERFACE:include>)
-target_link_libraries(${PROJECT_NAME} INTERFACE rclcpp::rclcpp hardware_interface::hardware_interface
-                                                controller_interface::controller_interface)
-ament_target_dependencies(${PROJECT_NAME} INTERFACE rclcpp hardware_interface controller_interface)
+target_link_libraries(
+  ${PROJECT_NAME}
+  INTERFACE rclcpp::rclcpp hardware_interface::hardware_interface
+            controller_interface::controller_interface)
+ament_target_dependencies(${PROJECT_NAME} INTERFACE rclcpp hardware_interface
+                          controller_interface)
 
 install(DIRECTORY include/ DESTINATION include)
 

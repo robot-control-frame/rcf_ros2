@@ -19,6 +19,8 @@
   <depend>transmission_interface</depend>
   <depend>rcf_standard_driver_interface</depend>
   <depend>rcf_transmission_interface</depend>
+  <depend>realtime_tools</depend>
+  <depend>control_msgs</depend>
   <exec_depend>rcf_fake_driver</exec_depend>
   <export>
     <build_type>ament_cmake</build_type>

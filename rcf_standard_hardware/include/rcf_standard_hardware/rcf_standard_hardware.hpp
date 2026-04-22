@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "control_msgs/msg/dynamic_joint_state.hpp"
+#include "realtime_tools/realtime_publisher.hpp"
 // rcf
 #include "rcf_hardware_interface/control_modes.hpp"
 #include "rcf_standard_driver_interface/rcf_standard_driver_base.hpp"
@@ -67,6 +69,7 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   bool setup_ft_sensors(YAML::Node& hw_config);
   bool setup_check_timeout(YAML::Node& hw_config);
 
+  void init_dynamic_actuator_state_msg();
   // motor
   std::vector<std::shared_ptr<ActData>> act_data_vector;
   std::unordered_map<uint16_t, size_t> id2act_index_;
@@ -89,6 +92,11 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
 
   // ros2_control
   std::vector<std::shared_ptr<transmission_interface::Transmission>> transmissions_;
+
+  std::shared_ptr<rclcpp::Publisher<control_msgs::msg::DynamicJointState>> dynamic_actuator_state_publisher_;
+  std::shared_ptr<realtime_tools::RealtimePublisher<control_msgs::msg::DynamicJointState>>
+      realtime_dynamic_actuator_state_publisher_;
+  control_msgs::msg::DynamicJointState dynamic_actuator_state_msg_;
 };
 
 }  // namespace rcf_standard_hardware
