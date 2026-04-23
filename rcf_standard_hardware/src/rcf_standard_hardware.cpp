@@ -231,6 +231,81 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
     transmission->joint_to_actuator();
   }
 
+  if (servo_init_) {
+    std::vector<rcf_standard_driver_interface::ServoCommand> all_servo_cmd;
+
+    for (size_t i = 0; i < act_data_vector.size(); i++) {
+      rcf_standard_driver_interface::ServoCommand servo_cmd;
+      servo_cmd.stamp = get_clock()->now();
+      servo_cmd.id = act_data_vector[i]->id;
+      if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::BEGIN) {
+        if (act_data_vector[i]->last_ctrl_mode != rcf_hardware_interface::ControlModes::BEGIN) {
+          act_data_vector[i]->cmd_pos_keep = act_data_vector[i]->pos;
+        } else {
+          act_data_vector[i]->cmd_pos = act_data_vector[i]->cmd_pos_keep;
+        }
+        servo_cmd.mode = rcf_standard_driver_interface::ControlModes::BEGIN;
+        act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
+      } else if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::MODE_EFFORT) {
+        servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_EFFORT;
+        act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
+      } else if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::MODE_VELOCITY) {
+        servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_VELOCITY;
+        act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
+      } else if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::MODE_POSITION) {
+        if (use_jump_command_protection_) {
+          // 阶跃指令输出log
+          if (act_data_vector[i]->act_type == ActType::STANDARD_REVOLUTE) {
+            if (std::abs(act_data_vector[i]->cmd_pos - act_data_vector[i]->pos) >=
+                act_data_vector[i]->jump_cmd_threshold) {
+              if ((get_clock()->now() - act_data_vector[i]->last_printf_jump_command_stamp).seconds() >
+                  1.0) {  // 1s内只打印一次
+                RCLCPP_ERROR(get_logger(),
+                             "Servo %s send a jump command, threshold is 0.087rad, current pos: %f, pos cmd: %f, "
+                             "current: %f, err code: %d",
+                             act_data_vector[i]->name.c_str(), act_data_vector[i]->pos, act_data_vector[i]->cmd_pos,
+                             act_data_vector[i]->cur, act_data_vector[i]->status);
+                act_data_vector[i]->last_printf_jump_command_stamp = get_clock()->now();
+              }
+            }
+          } else if (act_data_vector[i]->act_type == ActType::STANDARD_PRISMATIC) {
+            if (std::abs(act_data_vector[i]->cmd_pos - act_data_vector[i]->pos) >=
+                act_data_vector[i]->jump_cmd_threshold) {
+              if ((get_clock()->now() - act_data_vector[i]->last_printf_jump_command_stamp).seconds() > 1.0) {
+                RCLCPP_ERROR(get_logger(),
+                             "Servo %s send a jump command, threshold is 0.002m, current pos: %f, pos cmd: %f, "
+                             "current: %f, err code: %d",
+                             act_data_vector[i]->name.c_str(), act_data_vector[i]->pos, act_data_vector[i]->cmd_pos,
+                             act_data_vector[i]->cur, act_data_vector[i]->status);
+                act_data_vector[i]->last_printf_jump_command_stamp = get_clock()->now();
+              }
+            }
+          } else {
+            // Do nothing
+          }
+        }
+        servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_POSITION;
+        act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
+      } else if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::MODE_PVT) {  // PVT mode
+        servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_PVT;
+        act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
+      } else {
+        // 不支持其余模式
+        servo_cmd.mode = rcf_standard_driver_interface::ControlModes::BEGIN;
+        act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
+      }
+
+      servo_cmd.position = act_data_vector[i]->cmd_pos;
+      servo_cmd.velocity = act_data_vector[i]->cmd_vel;
+      servo_cmd.effort = act_data_vector[i]->cmd_effort;
+      servo_cmd.v1 = static_cast<uint16_t>(std::min(65535.0, std::max(0.0, act_data_vector[i]->cmd_v1)));
+      servo_cmd.v2 = static_cast<uint16_t>(std::min(65535.0, std::max(0.0, act_data_vector[i]->cmd_v2)));
+      all_servo_cmd.push_back(servo_cmd);
+    }
+
+    driver_->set_servo_command(all_servo_cmd);
+  }
+
   dynamic_actuator_state_msg_.header.stamp = get_clock()->now();
   for (size_t i = 0; i < act_data_vector.size(); i++) {
     auto& act_data = act_data_vector[i];

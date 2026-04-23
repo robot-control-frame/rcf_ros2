@@ -57,11 +57,13 @@ class RcfSimpleTransmission : public transmission_interface::Transmission {
   double get_joint_offset() const { return jnt_offset_; }
 
   std::vector<std::string> get_supported_actuator_interfaces() const override {
-    return {"position", "velocity", "effort"};
+    return {"position",     "velocity",   "effort", "control_mode", "cmd_position",
+            "cmd_velocity", "cmd_effort", "cmd_v1", "cmd_v2",       "cmd_v3"};
   }
 
   std::vector<std::string> get_supported_joint_interfaces() const override {
-    return {"position", "velocity", "effort"};
+    return {"position",     "velocity",   "effort", "control_mode", "cmd_position",
+            "cmd_velocity", "cmd_effort", "cmd_v1", "cmd_v2",       "cmd_v3"};
   }
 
  protected:

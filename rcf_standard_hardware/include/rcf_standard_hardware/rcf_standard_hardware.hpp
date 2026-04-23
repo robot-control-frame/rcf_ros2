@@ -97,6 +97,9 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   std::shared_ptr<realtime_tools::RealtimePublisher<control_msgs::msg::DynamicJointState>>
       realtime_dynamic_actuator_state_publisher_;
   control_msgs::msg::DynamicJointState dynamic_actuator_state_msg_;
+
+  bool servo_init_{true};
+  bool use_jump_command_protection_{true};
 };
 
 }  // namespace rcf_standard_hardware
