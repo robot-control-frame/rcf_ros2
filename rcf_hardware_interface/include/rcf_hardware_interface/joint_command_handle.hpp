@@ -8,9 +8,9 @@
 #include <string>
 #include <vector>
 
-#include "control_modes.hpp"
 #include "controller_interface/helpers.hpp"
 #include "hardware_interface/loaned_command_interface.hpp"
+#include "rcf_hardware_interface/control_modes.hpp"
 
 namespace rcf_hardware_interface {
 

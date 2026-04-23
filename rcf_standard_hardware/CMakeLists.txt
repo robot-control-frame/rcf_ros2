@@ -38,7 +38,7 @@ ament_target_dependencies(rcf_standard_hardware PUBLIC
                           ${THIS_PACKAGE_INCLUDE_DEPENDS})
 
 # Export hardware plugins
-pluginlib_export_plugin_description_file(hardware_interface plugin.xml)
+pluginlib_export_plugin_description_file(hardware_interface plugins.xml)
 
 # INSTALL
 install(DIRECTORY include/ DESTINATION include/rcf_standard_hardware)
