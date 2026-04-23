@@ -1,3 +1,7 @@
+/*******************************************************************************
+ * Copyright (c) 2026/04/23, Liao Lunjia.
+ * All rights reserved.
+ *******************************************************************************/
 #include "rcf_standard_hardware/rcf_standard_hardware.hpp"
 
 #include <cmath>
@@ -52,6 +56,10 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
   }
   if (!setup_transmission(transmissions_config)) {
     RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup TRANSMISSION FAILURE");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+  if (!setup_joint_limits(transmissions_config)) {
+    RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup JOINT LIMITS FAILURE");
     return hardware_interface::CallbackReturn::ERROR;
   }
   if (!setup_imus(rcf_std_hardware_config)) {
@@ -225,8 +233,11 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
 }
 
 hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /*time*/,
-                                                           const rclcpp::Duration& /*period*/) {
+                                                           const rclcpp::Duration& period) {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
+  for (auto& joint_limits : joint_limits_) {
+    joint_limits->enforce(period);
+  }
   for (auto& transmission : transmissions_) {
     transmission->joint_to_actuator();
   }
@@ -396,7 +407,6 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
                                           });
 
         if (act_data_iter != act_data_vector.end()) {
-          RCLCPP_INFO(get_logger(), "Found actuator: %s", act_info.name.c_str());
         } else {
           RCLCPP_ERROR(get_logger(), "Unknown actuator: %s", act_info.name.c_str());
           return false;
@@ -480,11 +490,76 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
         actuator_handles.push_back(actuator_cmd_v2_handle);
         actuator_handles.push_back(actuator_cmd_v3_handle);
         transmission->configure(joint_handles, actuator_handles);
-        // RCLCPP_INFO(get_logger(), "Setup transmission: %s %s %f %f", joint_info.name.c_str(), act_info.name.c_str(),
-        // act_info.mechanical_reduction, joint_info.offset);
       }
       transmissions_.push_back(transmission);
-      RCLCPP_INFO(get_logger(), "Setup transmission: %s %s", name.c_str(), type.c_str());
+    }
+  } catch (const std::exception& e) {
+    RCLCPP_ERROR(get_logger(), "%s", e.what());
+    return false;
+  }
+  return true;
+}
+
+bool RcfStandardHardware::setup_joint_limits(YAML::Node& transmissions_config) {
+  try {
+    auto transmissions_data = transmissions_config["transmissions"];
+    for (auto trans : transmissions_data) {
+      YAML::Node trans_config = trans.second;
+      YAML::Node joint_config = trans_config["joint"];
+      auto joint_name = joint_config["name"].as<std::string>();
+      YAML::Node joint_limit_config = joint_config["limit"];
+      joint_limits::JointLimits limit;
+      if (joint_limit_config.IsNull()) {
+        RCLCPP_ERROR(get_logger(), "The joint %s does not contain limiting parameters.", joint_name.c_str());
+      } else {
+        auto lower = joint_limit_config["lower"];
+        auto upper = joint_limit_config["upper"];
+        auto velocity = joint_limit_config["velocity"];
+        auto effort = joint_limit_config["effort"];
+
+        if (lower.IsNull() or upper.IsNull()) {
+          RCLCPP_ERROR(get_logger(), "The joint %s does not contain position limiting  parameters.",
+                       joint_name.c_str());
+        } else {
+          limit.has_position_limits = true;
+          limit.min_position = lower.as<double>() + std::numeric_limits<double>::epsilon();
+          limit.max_position = upper.as<double>() - std::numeric_limits<double>::epsilon();
+        }
+        if (velocity.IsNull()) {
+          RCLCPP_ERROR(get_logger(), "The joint %s does not contain velocity limiting  parameters.",
+                       joint_name.c_str());
+        } else {
+          limit.has_velocity_limits = true;
+          limit.max_velocity = velocity.as<double>();
+        }
+
+        if (effort.IsNull()) {
+          RCLCPP_ERROR(get_logger(), "The joint %s does not contain effort limiting  parameters.", joint_name.c_str());
+        } else {
+          limit.has_effort_limits = true;
+          limit.max_effort = effort.as<double>();
+        }
+      }
+
+      auto joint_data_iter = std::find_if(joint_data_vector.begin(), joint_data_vector.end(),
+                                          [joint_name](const std::shared_ptr<JointData>& ptr) {
+                                            if (!ptr) return false;
+                                            return ptr->name == joint_name;
+                                          });
+
+      if (joint_data_iter != joint_data_vector.end()) {
+      } else {
+        RCLCPP_ERROR(get_logger(), "Unknown joint: %s", joint_name.c_str());
+        return false;
+      }
+
+      auto joint_limits = std::make_shared<rcf_joint_limits_interface::RcfJointLimits>(
+          limit, &(joint_data_iter->get()->position), &(joint_data_iter->get()->velocity),
+          &(joint_data_iter->get()->effort), &(joint_data_iter->get()->position_command),
+          &(joint_data_iter->get()->velocity_command), &(joint_data_iter->get()->effort_command));
+      joint_limits_.push_back(joint_limits);
+
+      RCLCPP_INFO(get_logger(), "Setup joint limits: %s", joint_name.c_str());
     }
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "%s", e.what());

@@ -1,3 +1,7 @@
+/*******************************************************************************
+ * Copyright (c) 2026/04/23, Liao Lunjia.
+ * All rights reserved.
+ *******************************************************************************/
 
 #pragma once
 
@@ -11,6 +15,7 @@
 #include "realtime_tools/realtime_publisher.hpp"
 // rcf
 #include <rcf_hardware_interface/control_modes.hpp>
+#include <rcf_joint_limits_interface/rcf_joint_limits.hpp>
 #include <rcf_standard_driver_interface/rcf_standard_driver_base.hpp>
 
 #include "rcf_standard_hardware/type.hpp"
@@ -31,8 +36,6 @@
 namespace rcf_standard_hardware {
 class RcfStandardHardware : public hardware_interface::SystemInterface {
  public:
-  RCLCPP_SHARED_PTR_DEFINITIONS(RcfStandardHardware);
-
   hardware_interface::CallbackReturn on_init(
       const hardware_interface::HardwareComponentInterfaceParams& params) override;
 
@@ -67,6 +70,7 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   bool setup_motors(YAML::Node& hw_config);
   bool setup_imus(YAML::Node& hw_config);
   bool setup_transmission(YAML::Node& transmissions_config);
+  bool setup_joint_limits(YAML::Node& transmissions_config);
   bool setup_ft_sensors(YAML::Node& hw_config);
   bool setup_check_timeout(YAML::Node& hw_config);
 
@@ -93,7 +97,7 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
 
   // ros2_control
   std::vector<std::shared_ptr<transmission_interface::Transmission>> transmissions_;
-
+  std::vector<std::shared_ptr<rcf_joint_limits_interface::RcfJointLimits>> joint_limits_;
   std::shared_ptr<rclcpp::Publisher<control_msgs::msg::DynamicJointState>> dynamic_actuator_state_publisher_;
   std::shared_ptr<realtime_tools::RealtimePublisher<control_msgs::msg::DynamicJointState>>
       realtime_dynamic_actuator_state_publisher_;

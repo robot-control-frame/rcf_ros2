@@ -14,6 +14,7 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
     rclcpp_lifecycle
     rcf_hardware_interface
     rcf_standard_driver_interface
+    rcf_joint_limits_interface
     transmission_interface
     rcf_transmission_interface
     yaml-cpp
@@ -28,8 +29,10 @@ endforeach()
 
 # COMPILE
 add_library(rcf_standard_hardware SHARED src/rcf_standard_hardware.cpp)
-target_link_libraries(${PROJECT_NAME} PUBLIC rclcpp::rclcpp yaml-cpp::yaml-cpp
-                                             realtime_tools::realtime_tools)
+target_link_libraries(
+  ${PROJECT_NAME}
+  PUBLIC rclcpp::rclcpp yaml-cpp::yaml-cpp realtime_tools::realtime_tools
+         rcf_joint_limits_interface::rcf_joint_limits_interface)
 target_include_directories(
   rcf_standard_hardware
   PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
