@@ -9,7 +9,6 @@
   <license>Apache License 2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <depend>rosa</depend>
 
   <depend>rcf_standard_driver_interface</depend>
   <export>

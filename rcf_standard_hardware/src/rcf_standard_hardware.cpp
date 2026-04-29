@@ -558,8 +558,6 @@ bool RcfStandardHardware::setup_joint_limits(YAML::Node& transmissions_config) {
           &(joint_data_iter->get()->effort), &(joint_data_iter->get()->position_command),
           &(joint_data_iter->get()->velocity_command), &(joint_data_iter->get()->effort_command));
       joint_limits_.push_back(joint_limits);
-
-      RCLCPP_INFO(get_logger(), "Setup joint limits: %s", joint_name.c_str());
     }
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "%s", e.what());
