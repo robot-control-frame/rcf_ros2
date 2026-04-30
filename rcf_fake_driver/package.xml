@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>rcf_fake_driver</name>
+  <version>0.0.1</version>
+  <description>rcf_fake_driver</description>
+
+  <maintainer email="lunjia.liao@ubtrobot.com">廖伦稼</maintainer>
+
+  <license>Apache License 2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rcf_standard_driver_interface</depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
