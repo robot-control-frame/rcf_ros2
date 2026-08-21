@@ -40,11 +40,15 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
       "rcf_standard_driver_interface", "rcf_standard_driver_interface::RcfStandardDriverBase");
 
   try {
-    driver_ = driver_loader.createSharedInstance("rcf_fake_driver/RcfFakeDriver");
+    RCLCPP_INFO(get_logger(), "Create driver: %s", "ubt_ecat_driver/UbtEcatDriver");
+    driver_ = driver_loader.createSharedInstance("ubt_ecat_driver/UbtEcatDriver");
     std::vector<std::string> driver_config;
     driver_config.push_back(rcf_std_hardware_config_path_);
+    if (!driver_->init(driver_config)) {
+      RCLCPP_ERROR(get_logger(), "Driver init failed.");
+      return hardware_interface::CallbackReturn::ERROR;
+    }
 
-    driver_->init(driver_config);
   } catch (pluginlib::PluginlibException& ex) {
     RCLCPP_ERROR(get_logger(), "Failed to create driver: %s", ex.what());
     return hardware_interface::CallbackReturn::ERROR;
@@ -309,8 +313,8 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
       servo_cmd.position = act_data_vector[i]->cmd_pos;
       servo_cmd.velocity = act_data_vector[i]->cmd_vel;
       servo_cmd.effort = act_data_vector[i]->cmd_effort;
-      servo_cmd.v1 = static_cast<uint16_t>(std::min(65535.0, std::max(0.0, act_data_vector[i]->cmd_v1)));
-      servo_cmd.v2 = static_cast<uint16_t>(std::min(65535.0, std::max(0.0, act_data_vector[i]->cmd_v2)));
+      servo_cmd.v1 = static_cast<uint32_t>(std::min(65535.0, std::max(0.0, act_data_vector[i]->cmd_v1)));
+      servo_cmd.v2 = static_cast<uint32_t>(std::min(65535.0, std::max(0.0, act_data_vector[i]->cmd_v2)));
       all_servo_cmd.push_back(servo_cmd);
     }
 
@@ -347,7 +351,7 @@ bool RcfStandardHardware::setup_motors(YAML::Node& hw_config) {
     for (auto motor : actuators_config) {
       std::string name = motor.first.as<std::string>();
       YAML::Node motor_config = motor.second;
-      uint16_t id = motor_config["id"].as<uint16_t>();
+      uint32_t id = motor_config["id"].as<uint32_t>();
       auto data = std::make_unique<ActData>();
       data->name = name;
       data->id = id;
@@ -574,7 +578,7 @@ bool RcfStandardHardware::setup_imus(YAML::Node& hw_config) {
     for (auto imu : imus_config) {
       std::string name = imu.first.as<std::string>();
       YAML::Node imu_config = imu.second;
-      uint16_t id = imu_config["id"].as<uint16_t>();
+      uint32_t id = imu_config["id"].as<uint32_t>();
       auto data = std::make_shared<rcf_standard_hardware::ImuData>();
       data->name = name;
       data->id = id;
@@ -597,7 +601,7 @@ bool RcfStandardHardware::setup_ft_sensors(YAML::Node& hw_config) {
     for (auto ft : fts_config) {
       std::string name = ft.first.as<std::string>();
       YAML::Node ft_config = ft.second;
-      uint16_t id = ft_config["id"].as<uint16_t>();
+      uint32_t id = ft_config["id"].as<uint32_t>();
       auto data = std::make_shared<ForceTorqueData>();
       data->name = name;
       data->id = id;

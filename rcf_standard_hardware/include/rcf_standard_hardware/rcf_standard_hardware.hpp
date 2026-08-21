@@ -77,14 +77,14 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   void init_dynamic_actuator_state_msg();
   // motor
   std::vector<std::shared_ptr<ActData>> act_data_vector;
-  std::unordered_map<uint16_t, size_t> id2act_index_;
+  std::unordered_map<uint32_t, size_t> id2act_index_;
   std::vector<std::shared_ptr<JointData>> joint_data_vector;
   // imu
   std::vector<std::shared_ptr<ImuData>> imus_data_vec_;
-  std::unordered_map<uint16_t, size_t> id2imu_index_;
+  std::unordered_map<uint32_t, size_t> id2imu_index_;
   // ft
   std::vector<std::shared_ptr<ForceTorqueData>> ft_sensor_data_vec_;
-  std::unordered_map<uint16_t, size_t> id2ft_index_;
+  std::unordered_map<uint32_t, size_t> id2ft_index_;
 
   // Objects for logging
   std::shared_ptr<rclcpp::Logger> logger_;
