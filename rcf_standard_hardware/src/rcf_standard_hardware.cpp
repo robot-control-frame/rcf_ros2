@@ -74,6 +74,15 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup FT SENSORS FAILURE");
     return hardware_interface::CallbackReturn::ERROR;
   }
+  servo_srv_callback_group_ = get_node()->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  servo_enable_srv_ = get_node()->create_service<std_srvs::srv::Trigger>(
+      get_name() + "/servo/enable",
+      std::bind(&RcfStandardHardware::servo_enable_cb, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::ServicesQoS(), servo_srv_callback_group_);
+  servo_disable_srv_ = get_node()->create_service<std_srvs::srv::Trigger>(
+      get_name() + "/servo/disable",
+      std::bind(&RcfStandardHardware::servo_disable_cb, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::ServicesQoS(), servo_srv_callback_group_);
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -246,7 +255,7 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
     transmission->joint_to_actuator();
   }
 
-  if (servo_init_) {
+  if (servo_init_.load()) {
     std::vector<rcf_standard_driver_interface::ServoCommand> all_servo_cmd;
 
     for (size_t i = 0; i < act_data_vector.size(); i++) {
@@ -658,6 +667,64 @@ void RcfStandardHardware::init_dynamic_actuator_state_msg() {
     dynamic_actuator_state_msg_.interface_values.emplace_back(if_value);
   }
 }
+
+void RcfStandardHardware::servo_enable_cb(const std_srvs::srv::Trigger::Request::ConstSharedPtr req,
+                                          std_srvs::srv::Trigger::Response::SharedPtr resp) {
+  servo_init_.store(false);
+  for (auto& item : act_data_vector) {
+    item->last_ctrl_mode = rcf_hardware_interface::ControlModes::NOMODE;
+  }
+
+  std::vector<uint16_t> servos_id;
+  for (auto& item : act_data_vector) {
+    servos_id.push_back(item->id);
+  }
+
+  if (driver_->servo_enable(servos_id)) {
+    RCLCPP_INFO(get_logger(), "servo success to enable");
+    servo_init_.store(true);
+    resp->success = true;
+
+    return;
+  } else {
+    RCLCPP_ERROR(get_logger(), "servo failed to enable");
+    resp->success = false;
+    return;
+  }
+
+  return;
+}
+void RcfStandardHardware::servo_disable_cb(const std_srvs::srv::Trigger::Request::ConstSharedPtr req,
+                                           std_srvs::srv::Trigger::Response::SharedPtr resp) {
+  if (!servo_init_.load()) {
+    RCLCPP_WARN(get_logger(), "servo already disabled");
+    resp->success = true;
+    resp->message = "servo already disabled";
+    return;
+  }
+
+  std::vector<uint16_t> servos_id;
+  for (auto& item : act_data_vector) {
+    servos_id.push_back(item->id);
+  }
+
+  if (driver_->servo_disable(servos_id)) {
+    RCLCPP_INFO(get_logger(), "servo success to disable");
+    servo_init_.store(false);
+    resp->message = "servo success to disable";
+    resp->success = true;
+
+    return;
+  } else {
+    RCLCPP_ERROR(get_logger(), "servo failed to disable");
+    resp->success = false;
+    resp->message = "servo failed to disable";
+    return;
+  }
+
+  return;
+}
+
 }  // namespace rcf_standard_hardware
 
 #include "pluginlib/class_list_macros.hpp"

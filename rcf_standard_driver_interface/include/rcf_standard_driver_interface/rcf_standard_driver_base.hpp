@@ -8,7 +8,8 @@
 #include <memory>
 #include <vector>
 
-#include "rclcpp/rclcpp.hpp"
+#include "rclcpp/clock.hpp"
+#include "rclcpp/logger.hpp"
 #include "type.hpp"
 namespace rcf_standard_driver_interface {
 
@@ -40,11 +41,11 @@ class RcfStandardDriverBase {
   virtual bool servo_enable(std::vector<uint16_t> servos_id) = 0;
 
   /**
-   * @brief 舵机标零
+   * @brief 禁用指定舵机,舵机在禁用之后,不会响应控制命令，也不会上报状态
    * @param servos_id 舵机ID列表
-   * @return 标零是否成功
+   * @return 禁用是否成功
    */
-  virtual bool servo_set_zero(std::vector<uint16_t> servos_id) = 0;
+  virtual bool servo_disable(std::vector<uint16_t> servos_id) { return true; }
 
   /**
    * @brief 获取所有舵机状态

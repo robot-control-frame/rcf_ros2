@@ -21,6 +21,8 @@
 #include "rcf_standard_hardware/type.hpp"
 
 // ros
+#include <std_srvs/srv/trigger.hpp>
+
 #include "rclcpp/clock.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp/macros.hpp"
@@ -66,6 +68,15 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   rclcpp::Clock::SharedPtr get_clock() const override { return clock_; }
 
  private:
+  // srv
+  rclcpp::CallbackGroup::SharedPtr servo_srv_callback_group_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr servo_enable_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr servo_disable_srv_;
+  void servo_enable_cb(const std_srvs::srv::Trigger::Request::ConstSharedPtr req,
+                       std_srvs::srv::Trigger::Response::SharedPtr resp);
+  void servo_disable_cb(std_srvs::srv::Trigger::Request::ConstSharedPtr req,
+                        std_srvs::srv::Trigger::Response::SharedPtr resp);
+
   // set hardware interface
   bool setup_motors(YAML::Node& hw_config);
   bool setup_imus(YAML::Node& hw_config);
@@ -103,7 +114,7 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
       realtime_dynamic_actuator_state_publisher_;
   control_msgs::msg::DynamicJointState dynamic_actuator_state_msg_;
 
-  bool servo_init_{true};
+  std::atomic<bool> servo_init_{false};
   bool use_jump_command_protection_{true};
 };
 
