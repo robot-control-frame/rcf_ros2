@@ -24,7 +24,7 @@ enum ControlModes {
 };
 
 struct ServoState {
-  rclcpp::Time stamp{RCL_STEADY_TIME};
+  rclcpp::Time stamp{0, 0, RCL_STEADY_TIME};
   uint32_t id{};
   double position{};     // rad or m
   double velocity{};     // rad/s or m/s
@@ -35,7 +35,7 @@ struct ServoState {
 };
 
 struct ServoCommand {
-  rclcpp::Time stamp{RCL_STEADY_TIME};
+  rclcpp::Time stamp{0, 0, RCL_STEADY_TIME};
   uint32_t id{};
   ControlModes mode{ControlModes::BEGIN};
   double position{};  // rad or m
@@ -47,14 +47,14 @@ struct ServoCommand {
 };
 
 struct ForceTorque {
-  rclcpp::Time stamp{RCL_STEADY_TIME};
+  rclcpp::Time stamp{0, 0, RCL_STEADY_TIME};
   uint32_t id{};
   double force[3];   // N
   double torque[3];  // Nm
 };
 
 struct Imu {
-  rclcpp::Time stamp{RCL_STEADY_TIME};
+  rclcpp::Time stamp{0, 0, RCL_STEADY_TIME};
   uint32_t id{};
   double orientation[4];          // quaternion
   double angular_velocity[3];     // rad/s

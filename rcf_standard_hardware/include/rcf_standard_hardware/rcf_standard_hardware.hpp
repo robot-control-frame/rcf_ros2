@@ -68,6 +68,9 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   rclcpp::Clock::SharedPtr get_clock() const override { return clock_; }
 
  private:
+  bool hardware_online_check();
+  hardware_interface::return_type hardware_timeout_check(const rclcpp::Time& time);
+
   // srv
   rclcpp::CallbackGroup::SharedPtr servo_srv_callback_group_;
   rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr servo_enable_srv_;
@@ -116,6 +119,10 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
 
   std::atomic<bool> servo_init_{false};
   bool use_jump_command_protection_{true};
+  double timeout_threshold_{0.1};
+  rclcpp::Time last_check_hw_time_;
+  bool check_timeout_{false};
+  bool hw_init_check_success_{false};
 };
 
 }  // namespace rcf_standard_hardware

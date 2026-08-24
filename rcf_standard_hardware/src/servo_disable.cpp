@@ -59,7 +59,7 @@ int main(int argc, char const* argv[]) {
   auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
   auto future = client->async_send_request(request);
 
-  const auto status = rclcpp::spin_until_future_complete(node, future, 5s);
+  const auto status = rclcpp::spin_until_future_complete(node, future, 10s);
   if (status != rclcpp::FutureReturnCode::SUCCESS) {
     RCLCPP_ERROR(logger, "Failed to call service: %s", service_name.c_str());
     rclcpp::shutdown();
