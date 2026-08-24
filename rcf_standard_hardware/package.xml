@@ -22,6 +22,7 @@
   <depend>rcf_joint_limits_interface</depend>
   <depend>realtime_tools</depend>
   <depend>control_msgs</depend>
+  <depend>std_srvs</depend>
   <exec_depend>rcf_fake_driver</exec_depend>
   <export>
     <build_type>ament_cmake</build_type>

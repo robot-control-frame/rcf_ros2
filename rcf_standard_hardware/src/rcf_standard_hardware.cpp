@@ -7,6 +7,7 @@
 #include <cmath>
 #include <hardware_interface/hardware_info.hpp>
 #include <memory>
+#include <rclcpp/logging.hpp>
 #include <string>
 #include <vector>
 
@@ -16,7 +17,7 @@ namespace rcf_standard_hardware {
 hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     const hardware_interface::HardwareComponentInterfaceParams& params) {
   logger_ = std::make_shared<rclcpp::Logger>(rclcpp::get_logger("RcfStandardHardware"));
-  clock_ = std::make_shared<rclcpp::Clock>(rclcpp::Clock());
+  clock_ = std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME);
 
   RCLCPP_INFO(get_logger(), "RcfStandardHardware::on_init");
   if (hardware_interface::SystemInterface::on_init(params) != hardware_interface::CallbackReturn::SUCCESS) {
@@ -40,11 +41,15 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
       "rcf_standard_driver_interface", "rcf_standard_driver_interface::RcfStandardDriverBase");
 
   try {
-    driver_ = driver_loader.createSharedInstance("rcf_fake_driver/RcfFakeDriver");
+    RCLCPP_INFO(get_logger(), "Create driver: %s", "ubt_ecat_driver/UbtEcatDriver");
+    driver_ = driver_loader.createSharedInstance("ubt_ecat_driver/UbtEcatDriver");
     std::vector<std::string> driver_config;
     driver_config.push_back(rcf_std_hardware_config_path_);
+    if (!driver_->init(driver_config)) {
+      RCLCPP_ERROR(get_logger(), "Driver init failed.");
+      return hardware_interface::CallbackReturn::ERROR;
+    }
 
-    driver_->init(driver_config);
   } catch (pluginlib::PluginlibException& ex) {
     RCLCPP_ERROR(get_logger(), "Failed to create driver: %s", ex.what());
     return hardware_interface::CallbackReturn::ERROR;
@@ -70,6 +75,19 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup FT SENSORS FAILURE");
     return hardware_interface::CallbackReturn::ERROR;
   }
+  if (!setup_check_timeout(rcf_std_hardware_config)) {
+    RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup CHECK TIMEOUT FAILURE");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+  servo_srv_callback_group_ = get_node()->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  servo_enable_srv_ = get_node()->create_service<std_srvs::srv::Trigger>(
+      get_name() + "/servo/enable",
+      std::bind(&RcfStandardHardware::servo_enable_cb, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::ServicesQoS(), servo_srv_callback_group_);
+  servo_disable_srv_ = get_node()->create_service<std_srvs::srv::Trigger>(
+      get_name() + "/servo/disable",
+      std::bind(&RcfStandardHardware::servo_disable_cb, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::ServicesQoS(), servo_srv_callback_group_);
 
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -151,6 +169,11 @@ std::vector<hardware_interface::CommandInterface> RcfStandardHardware::export_co
 hardware_interface::CallbackReturn RcfStandardHardware::on_activate(const rclcpp_lifecycle::State& /*previous_state*/) {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
   RCLCPP_INFO(get_logger(), "RcfStandardHardware::on_activate.");
+  hw_init_check_success_ = hardware_online_check();
+  if (!hw_init_check_success_) {
+    RCLCPP_ERROR(get_logger(), "Hardware online check failed.");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
   init_dynamic_actuator_state_msg();
   return hardware_interface::CallbackReturn::SUCCESS;
 }
@@ -168,6 +191,7 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
                                                           const rclcpp::Duration& /*period*/) {
   // read servo
   auto servo_status = driver_->get_servo_state();
+  // RCLCPP_INFO(get_logger(), "Servo status size: %zu", servo_status.size());
   for (auto& item : servo_status) {
     auto iter = id2act_index_.find(item.id);
     if (iter != id2act_index_.end()) {
@@ -229,12 +253,13 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
     }
   }
 
-  return hardware_interface::return_type::OK;
+  return hardware_timeout_check(time);
 }
 
 hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /*time*/,
                                                            const rclcpp::Duration& period) {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
+
   for (auto& joint_limits : joint_limits_) {
     joint_limits->enforce(period);
   }
@@ -242,28 +267,28 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
     transmission->joint_to_actuator();
   }
 
-  if (servo_init_) {
+  if (servo_init_.load()) {
     std::vector<rcf_standard_driver_interface::ServoCommand> all_servo_cmd;
 
     for (size_t i = 0; i < act_data_vector.size(); i++) {
       rcf_standard_driver_interface::ServoCommand servo_cmd;
       servo_cmd.stamp = get_clock()->now();
       servo_cmd.id = act_data_vector[i]->id;
-      if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::BEGIN) {
-        if (act_data_vector[i]->last_ctrl_mode != rcf_hardware_interface::ControlModes::BEGIN) {
+      if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::BEGIN)) {
+        if (!is_control_mode_value(act_data_vector[i]->last_ctrl_mode, rcf_hardware_interface::ControlMode::BEGIN)) {
           act_data_vector[i]->cmd_pos_keep = act_data_vector[i]->pos;
         } else {
           act_data_vector[i]->cmd_pos = act_data_vector[i]->cmd_pos_keep;
         }
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::BEGIN;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::MODE_EFFORT) {
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_EFFORT)) {
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_EFFORT;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::MODE_VELOCITY) {
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_VELOCITY)) {
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_VELOCITY;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::MODE_POSITION) {
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_POSITION)) {
         if (use_jump_command_protection_) {
           // 阶跃指令输出log
           if (act_data_vector[i]->act_type == ActType::STANDARD_REVOLUTE) {
@@ -297,7 +322,7 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
         }
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_POSITION;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::MODE_PVT) {  // PVT mode
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_PVT)) {  // PVT mode
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_PVT;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
       } else {
@@ -309,8 +334,8 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
       servo_cmd.position = act_data_vector[i]->cmd_pos;
       servo_cmd.velocity = act_data_vector[i]->cmd_vel;
       servo_cmd.effort = act_data_vector[i]->cmd_effort;
-      servo_cmd.v1 = static_cast<uint16_t>(std::min(65535.0, std::max(0.0, act_data_vector[i]->cmd_v1)));
-      servo_cmd.v2 = static_cast<uint16_t>(std::min(65535.0, std::max(0.0, act_data_vector[i]->cmd_v2)));
+      servo_cmd.v1 = static_cast<uint32_t>(std::min(65535.0, std::max(0.0, act_data_vector[i]->cmd_v1)));
+      servo_cmd.v2 = static_cast<uint32_t>(std::min(65535.0, std::max(0.0, act_data_vector[i]->cmd_v2)));
       all_servo_cmd.push_back(servo_cmd);
     }
 
@@ -347,7 +372,7 @@ bool RcfStandardHardware::setup_motors(YAML::Node& hw_config) {
     for (auto motor : actuators_config) {
       std::string name = motor.first.as<std::string>();
       YAML::Node motor_config = motor.second;
-      uint16_t id = motor_config["id"].as<uint16_t>();
+      uint32_t id = motor_config["id"].as<uint32_t>();
       auto data = std::make_unique<ActData>();
       data->name = name;
       data->id = id;
@@ -423,7 +448,8 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
         joint_interface_data->position = 0.0;
         joint_interface_data->velocity = 0.0;
         joint_interface_data->effort = 0.0;
-        joint_interface_data->control_mode = rcf_hardware_interface::ControlModes::BEGIN;
+        joint_interface_data->control_mode =
+            rcf_hardware_interface::to_interface_value(rcf_hardware_interface::ControlMode::BEGIN);
         joint_interface_data->position_command = 0.0;
         joint_interface_data->velocity_command = 0.0;
         joint_interface_data->effort_command = 0.0;
@@ -574,7 +600,7 @@ bool RcfStandardHardware::setup_imus(YAML::Node& hw_config) {
     for (auto imu : imus_config) {
       std::string name = imu.first.as<std::string>();
       YAML::Node imu_config = imu.second;
-      uint16_t id = imu_config["id"].as<uint16_t>();
+      uint32_t id = imu_config["id"].as<uint32_t>();
       auto data = std::make_shared<rcf_standard_hardware::ImuData>();
       data->name = name;
       data->id = id;
@@ -597,7 +623,7 @@ bool RcfStandardHardware::setup_ft_sensors(YAML::Node& hw_config) {
     for (auto ft : fts_config) {
       std::string name = ft.first.as<std::string>();
       YAML::Node ft_config = ft.second;
-      uint16_t id = ft_config["id"].as<uint16_t>();
+      uint32_t id = ft_config["id"].as<uint32_t>();
       auto data = std::make_shared<ForceTorqueData>();
       data->name = name;
       data->id = id;
@@ -606,6 +632,18 @@ bool RcfStandardHardware::setup_ft_sensors(YAML::Node& hw_config) {
       ft_index += 1;
     }
     RCLCPP_INFO(get_logger(), "Setup ft sensors success");
+  } catch (const std::exception& e) {
+    RCLCPP_ERROR(get_logger(), "%s", e.what());
+    return false;
+  }
+  return true;
+}
+
+bool RcfStandardHardware::setup_check_timeout(YAML::Node& hw_config) {
+  try {
+    auto standard_hardware_data = hw_config["rcf_std_hardware"];
+    timeout_threshold_ = standard_hardware_data["timeout_threshold"].as<double>(0.1);
+    check_timeout_ = standard_hardware_data["check_timeout"].as<bool>(true);
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "%s", e.what());
     return false;
@@ -654,6 +692,213 @@ void RcfStandardHardware::init_dynamic_actuator_state_msg() {
     dynamic_actuator_state_msg_.interface_values.emplace_back(if_value);
   }
 }
+
+void RcfStandardHardware::servo_enable_cb(const std_srvs::srv::Trigger::Request::ConstSharedPtr req,
+                                          std_srvs::srv::Trigger::Response::SharedPtr resp) {
+  servo_init_.store(false);
+  for (auto& item : act_data_vector) {
+    item->last_ctrl_mode = rcf_hardware_interface::to_interface_value(rcf_hardware_interface::ControlMode::NOMODE);
+  }
+
+  std::vector<uint16_t> servos_id;
+  for (auto& item : act_data_vector) {
+    servos_id.push_back(item->id);
+  }
+
+  if (driver_->servo_enable(servos_id)) {
+    RCLCPP_INFO(get_logger(), "servo success to enable");
+    servo_init_.store(true);
+    resp->success = true;
+    resp->message = "servo success to enable";
+
+    return;
+  } else {
+    RCLCPP_ERROR(get_logger(), "servo failed to enable");
+    resp->success = false;
+    resp->message = "servo failed to enable";
+    return;
+  }
+
+  return;
+}
+void RcfStandardHardware::servo_disable_cb(const std_srvs::srv::Trigger::Request::ConstSharedPtr req,
+                                           std_srvs::srv::Trigger::Response::SharedPtr resp) {
+  if (!servo_init_.load()) {
+    RCLCPP_WARN(get_logger(), "servo already disabled");
+    resp->success = true;
+    resp->message = "servo already disabled";
+    return;
+  }
+
+  std::vector<uint16_t> servos_id;
+  for (auto& item : act_data_vector) {
+    servos_id.push_back(item->id);
+  }
+
+  if (driver_->servo_disable(servos_id)) {
+    RCLCPP_INFO(get_logger(), "servo success to disable");
+    servo_init_.store(false);
+    resp->message = "servo success to disable";
+    resp->success = true;
+
+    return;
+  } else {
+    RCLCPP_ERROR(get_logger(), "servo failed to disable");
+    resp->success = false;
+    resp->message = "servo failed to disable";
+    return;
+  }
+
+  return;
+}
+
+bool RcfStandardHardware::hardware_online_check() {
+  RCLCPP_INFO(get_logger(), "开始硬件在线自检.");
+  auto start_check_time = get_clock()->now();
+  rclcpp::Rate check_rate(1000);
+  // 3秒内如果在线，则认为硬件在线
+  while (rclcpp::ok() and (get_clock()->now() - start_check_time).seconds() < 3.0) {
+    bool servo_online = true;
+    bool imu_online = true;
+    bool ft_online = true;
+
+    auto now = get_clock()->now();
+
+    read(get_clock()->now(), rclcpp::Duration::from_seconds(0.001));
+    if (check_timeout_) {
+      // servo
+      for (auto& item : act_data_vector) {
+        if ((now - item->status_stamp).seconds() > timeout_threshold_) {
+          item->online = false;
+        } else {
+          item->online = true;
+        }
+        servo_online = servo_online && item->online;
+      }
+    }
+
+    // IMU
+    for (auto& item : imus_data_vec_) {
+      if ((now - item->stamp).seconds() > timeout_threshold_) {
+        item->online = false;
+      } else {
+        item->online = true;
+      }
+      imu_online = imu_online && item->online;
+    }
+    // ft
+    for (auto& item : ft_sensor_data_vec_) {
+      if ((now - item->stamp).seconds() > timeout_threshold_) {
+        item->online = false;
+      } else {
+        item->online = true;
+      }
+      ft_online = ft_online && item->online;
+    }
+
+    if (servo_online and imu_online and ft_online) {
+      hw_init_check_success_ = true;
+      break;
+    }
+    check_rate.sleep();
+  }
+
+  if (hw_init_check_success_) {
+    RCLCPP_INFO(get_logger(), "硬件在线自检成功.");
+    return true;
+  } else {
+    for (auto& item : act_data_vector) {
+      if (!item->online) {
+        RCLCPP_ERROR(get_logger(), "舵机: %d, %s 超时.", item->id, item->name.c_str());
+      }
+    }
+    for (auto& item : imus_data_vec_) {
+      if (!item->online) {
+        RCLCPP_ERROR(get_logger(), "IMU: %d, %s 超时.", item->id, item->name.c_str());
+      }
+    }
+    for (auto& item : ft_sensor_data_vec_) {
+      if (!item->online) {
+        RCLCPP_ERROR(get_logger(), "六维力: %d, %s 超时.", item->id, item->name.c_str());
+      }
+    }
+    RCLCPP_ERROR(get_logger(), "硬件在线自检失败.");
+    return false;
+  }
+}
+
+hardware_interface::return_type RcfStandardHardware::hardware_timeout_check(const rclcpp::Time& time) {
+  // check servo
+
+  if (!hw_init_check_success_) {
+    return hardware_interface::return_type::OK;
+  }
+  bool servo_online = true;
+  bool imu_online = true;
+  bool ft_online = true;
+
+  if (check_timeout_) {
+    for (auto& item : act_data_vector) {
+      if ((get_clock()->now() - item->status_stamp).seconds() < timeout_threshold_) {
+        // ULOGD("Motor  device mormal.");
+      } else if ((time - item->status_stamp).seconds() > timeout_threshold_ and
+                 (time - item->status_stamp).seconds() <= 3.0) {
+        if ((time - item->last_timeout_print_stamp).seconds() > 0.1) {
+          RCLCPP_WARN(get_logger(), "舵机: %d, %s 超时 %f 秒.", item->id, item->name.c_str(),
+                      (time - item->status_stamp).seconds());
+          item->last_timeout_print_stamp = time;
+        }
+
+      } else if ((time - item->status_stamp).seconds() >= 3.0) {
+        servo_online = false;
+        RCLCPP_ERROR(get_logger(), "舵机: %d, %s 超时 %f 秒, 舵机可能离线.", item->id, item->name.c_str(),
+                     (time - item->status_stamp).seconds());
+      }
+    }
+
+    for (auto& item : imus_data_vec_) {
+      if ((time - item->stamp).seconds() < timeout_threshold_) {
+        // ULOGD("IMU sensor device mormal.");
+      } else if ((time - item->stamp).seconds() > timeout_threshold_ and (time - item->stamp).seconds() <= 3.0) {
+        if ((time - item->last_timeout_print_stamp).seconds() > 0.1) {
+          RCLCPP_WARN(get_logger(), "IMU %s device timeout %f second.", item->name.c_str(),
+                      (time - item->stamp).seconds());
+          item->last_timeout_print_stamp = time;
+        }
+      } else if ((time - item->stamp).seconds() >= 3.0) {
+        imu_online = false;
+        RCLCPP_ERROR(get_logger(), "IMU: %d, %s 超时 %f 秒, IMU 可能离线.", item->id, item->name.c_str(),
+                     (time - item->stamp).seconds());
+      }
+    }
+    // check ft
+
+    for (auto& item : ft_sensor_data_vec_) {
+      if ((time - item->stamp).seconds() < timeout_threshold_) {
+        // ULOGD("FT sensor device mormal.");
+      } else if ((time - item->stamp).seconds() > timeout_threshold_ and (time - item->stamp).seconds() <= 3.0) {
+        if ((time - item->last_timeout_print_stamp).seconds() > 0.1) {
+          RCLCPP_WARN(get_logger(), "FT %s device timeout %f second.", item->name.c_str(),
+                      (time - item->stamp).seconds());
+          item->last_timeout_print_stamp = time;
+        }
+      } else if ((time - item->stamp).seconds() >= 3.0) {
+        ft_online = false;
+        RCLCPP_ERROR(get_logger(), "FT: %d, %s 超时 %f 秒, FT 可能离线.", item->id, item->name.c_str(),
+                     (time - item->stamp).seconds());
+      }
+    }
+
+    if (!servo_online or !imu_online or !ft_online) {
+      RCLCPP_FATAL(get_logger(), "检测到硬件异常, 请检查硬件连接.");
+      return hardware_interface::return_type::ERROR;
+    }
+  }
+
+  last_check_hw_time_ = time;
+  return hardware_interface::return_type::OK;
+}
+
 }  // namespace rcf_standard_hardware
 
 #include "pluginlib/class_list_macros.hpp"

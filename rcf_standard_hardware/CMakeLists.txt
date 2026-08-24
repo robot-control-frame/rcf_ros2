@@ -19,7 +19,8 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
     rcf_transmission_interface
     yaml-cpp
     realtime_tools
-    control_msgs)
+    control_msgs
+    std_srvs)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -43,6 +44,12 @@ ament_target_dependencies(rcf_standard_hardware PUBLIC
 # Export hardware plugins
 pluginlib_export_plugin_description_file(hardware_interface plugins.xml)
 
+add_executable(servo_enable src/servo_enable.cpp)
+ament_target_dependencies(servo_enable PUBLIC rclcpp std_srvs)
+
+add_executable(servo_disable src/servo_disable.cpp)
+ament_target_dependencies(servo_disable PUBLIC rclcpp std_srvs)
+
 # INSTALL
 install(DIRECTORY include/ DESTINATION include/rcf_standard_hardware)
 install(
@@ -51,6 +58,8 @@ install(
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION bin)
+install(TARGETS servo_enable DESTINATION lib/${PROJECT_NAME})
+install(TARGETS servo_disable DESTINATION lib/${PROJECT_NAME})
 
 # EXPORTS
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)

@@ -31,11 +31,10 @@ class JointCommandHandle {
     return controller_interface::get_ordered_interfaces(command_interfaces, interface_names_, "", command_interfaces_);
   }
   void release_interfaces() { command_interfaces_.clear(); }
-  /// Mode value must use constants from \c ControlMode (e.g. \c ControlMode::MODE_EFFORT).
-  bool setCommand(double mode, double cmd_position, double cmd_velocity, double cmd_effort, double cmd_v1,
+  bool setCommand(ControlMode mode, double cmd_position, double cmd_velocity, double cmd_effort, double cmd_v1,
                   double cmd_v2, double cmd_v3) {
     bool success = true;
-    success &= command_interfaces_[0].get().set_value(mode);
+    success &= command_interfaces_[0].get().set_value(to_interface_value(mode));
     success &= command_interfaces_[1].get().set_value(cmd_position);
     success &= command_interfaces_[2].get().set_value(cmd_velocity);
     success &= command_interfaces_[3].get().set_value(cmd_effort);

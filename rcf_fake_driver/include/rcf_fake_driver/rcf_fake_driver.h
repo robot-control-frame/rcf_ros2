@@ -10,9 +10,9 @@
 #include <mutex>
 #include <rcf_standard_driver_interface/rcf_standard_driver_base.hpp>
 #include <rcf_standard_driver_interface/type.hpp>
+#include <rclcpp/rclcpp.hpp>
 #include <thread>
 #include <unordered_map>
-
 namespace rcf_fake_driver {
 class RcfFakeDriver : public rcf_standard_driver_interface::RcfStandardDriverBase {
  public:
@@ -23,7 +23,7 @@ class RcfFakeDriver : public rcf_standard_driver_interface::RcfStandardDriverBas
   virtual bool stopping() override;
 
   virtual bool servo_enable(std::vector<uint16_t> servos_id) override;
-  virtual bool servo_set_zero(std::vector<uint16_t> servos_id) override;
+  virtual bool servo_disable(std::vector<uint16_t> servos_id) override;
 
   virtual std::vector<rcf_standard_driver_interface::ServoState> get_servo_state() override;
   virtual void set_servo_command(std::vector<rcf_standard_driver_interface::ServoCommand> commands) override;

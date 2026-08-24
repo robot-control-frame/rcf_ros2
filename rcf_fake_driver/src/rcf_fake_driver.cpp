@@ -123,7 +123,7 @@ bool RcfFakeDriver::servo_enable(std::vector<uint16_t> servos_id) {
   // todo: 发送舵机使能指令指令
   return true;
 }
-bool RcfFakeDriver::servo_set_zero(std::vector<uint16_t> servos_id) {
+bool RcfFakeDriver::servo_disable(std::vector<uint16_t> servos_id) {
   // todo: 发送舵机标零指令
   return true;
 }

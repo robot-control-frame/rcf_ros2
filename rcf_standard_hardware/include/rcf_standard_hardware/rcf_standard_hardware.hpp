@@ -21,6 +21,8 @@
 #include "rcf_standard_hardware/type.hpp"
 
 // ros
+#include <std_srvs/srv/trigger.hpp>
+
 #include "rclcpp/clock.hpp"
 #include "rclcpp/logger.hpp"
 #include "rclcpp/macros.hpp"
@@ -66,6 +68,18 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   rclcpp::Clock::SharedPtr get_clock() const override { return clock_; }
 
  private:
+  bool hardware_online_check();
+  hardware_interface::return_type hardware_timeout_check(const rclcpp::Time& time);
+
+  // srv
+  rclcpp::CallbackGroup::SharedPtr servo_srv_callback_group_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr servo_enable_srv_;
+  rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr servo_disable_srv_;
+  void servo_enable_cb(const std_srvs::srv::Trigger::Request::ConstSharedPtr req,
+                       std_srvs::srv::Trigger::Response::SharedPtr resp);
+  void servo_disable_cb(std_srvs::srv::Trigger::Request::ConstSharedPtr req,
+                        std_srvs::srv::Trigger::Response::SharedPtr resp);
+
   // set hardware interface
   bool setup_motors(YAML::Node& hw_config);
   bool setup_imus(YAML::Node& hw_config);
@@ -77,14 +91,14 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   void init_dynamic_actuator_state_msg();
   // motor
   std::vector<std::shared_ptr<ActData>> act_data_vector;
-  std::unordered_map<uint16_t, size_t> id2act_index_;
+  std::unordered_map<uint32_t, size_t> id2act_index_;
   std::vector<std::shared_ptr<JointData>> joint_data_vector;
   // imu
   std::vector<std::shared_ptr<ImuData>> imus_data_vec_;
-  std::unordered_map<uint16_t, size_t> id2imu_index_;
+  std::unordered_map<uint32_t, size_t> id2imu_index_;
   // ft
   std::vector<std::shared_ptr<ForceTorqueData>> ft_sensor_data_vec_;
-  std::unordered_map<uint16_t, size_t> id2ft_index_;
+  std::unordered_map<uint32_t, size_t> id2ft_index_;
 
   // Objects for logging
   std::shared_ptr<rclcpp::Logger> logger_;
@@ -103,8 +117,12 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
       realtime_dynamic_actuator_state_publisher_;
   control_msgs::msg::DynamicJointState dynamic_actuator_state_msg_;
 
-  bool servo_init_{true};
+  std::atomic<bool> servo_init_{false};
   bool use_jump_command_protection_{true};
+  double timeout_threshold_{0.1};
+  rclcpp::Time last_check_hw_time_;
+  bool check_timeout_{false};
+  bool hw_init_check_success_{false};
 };
 
 }  // namespace rcf_standard_hardware
