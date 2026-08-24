@@ -36,8 +36,8 @@
 //
 #include "rcf_common/filters/lp_filter.hpp"
 
-#include "rclcpp/rclcpp.hpp"
-
+#include <cmath>
+#include <rclcpp/logging.hpp>
 namespace rcf_common {
 namespace filters {
 LowPassFilter::LowPassFilter(double cutoff_freq) : delta_t_(0.0) { cutoff_frequency_ = cutoff_freq; }

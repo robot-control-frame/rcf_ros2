@@ -25,6 +25,13 @@ target_link_libraries(
 ament_target_dependencies(${PROJECT_NAME} INTERFACE rclcpp hardware_interface
                           controller_interface)
 
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_headers test/test_headers.cpp)
+  target_link_libraries(test_headers ${PROJECT_NAME})
+endif()
+
 install(DIRECTORY include/ DESTINATION include)
 
 ament_export_include_directories(include)

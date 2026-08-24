@@ -259,6 +259,7 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
 hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /*time*/,
                                                            const rclcpp::Duration& period) {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
+
   for (auto& joint_limits : joint_limits_) {
     joint_limits->enforce(period);
   }
@@ -273,21 +274,21 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
       rcf_standard_driver_interface::ServoCommand servo_cmd;
       servo_cmd.stamp = get_clock()->now();
       servo_cmd.id = act_data_vector[i]->id;
-      if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::BEGIN) {
-        if (act_data_vector[i]->last_ctrl_mode != rcf_hardware_interface::ControlModes::BEGIN) {
+      if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::BEGIN)) {
+        if (!is_control_mode_value(act_data_vector[i]->last_ctrl_mode, rcf_hardware_interface::ControlMode::BEGIN)) {
           act_data_vector[i]->cmd_pos_keep = act_data_vector[i]->pos;
         } else {
           act_data_vector[i]->cmd_pos = act_data_vector[i]->cmd_pos_keep;
         }
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::BEGIN;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::MODE_EFFORT) {
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_EFFORT)) {
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_EFFORT;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::MODE_VELOCITY) {
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_VELOCITY)) {
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_VELOCITY;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::MODE_POSITION) {
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_POSITION)) {
         if (use_jump_command_protection_) {
           // 阶跃指令输出log
           if (act_data_vector[i]->act_type == ActType::STANDARD_REVOLUTE) {
@@ -321,7 +322,7 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
         }
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_POSITION;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (act_data_vector[i]->ctrl_mode == rcf_hardware_interface::ControlModes::MODE_PVT) {  // PVT mode
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_PVT)) {  // PVT mode
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_PVT;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
       } else {
@@ -447,7 +448,8 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
         joint_interface_data->position = 0.0;
         joint_interface_data->velocity = 0.0;
         joint_interface_data->effort = 0.0;
-        joint_interface_data->control_mode = rcf_hardware_interface::ControlModes::BEGIN;
+        joint_interface_data->control_mode =
+            rcf_hardware_interface::to_interface_value(rcf_hardware_interface::ControlMode::BEGIN);
         joint_interface_data->position_command = 0.0;
         joint_interface_data->velocity_command = 0.0;
         joint_interface_data->effort_command = 0.0;
@@ -695,7 +697,7 @@ void RcfStandardHardware::servo_enable_cb(const std_srvs::srv::Trigger::Request:
                                           std_srvs::srv::Trigger::Response::SharedPtr resp) {
   servo_init_.store(false);
   for (auto& item : act_data_vector) {
-    item->last_ctrl_mode = rcf_hardware_interface::ControlModes::NOMODE;
+    item->last_ctrl_mode = rcf_hardware_interface::to_interface_value(rcf_hardware_interface::ControlMode::NOMODE);
   }
 
   std::vector<uint16_t> servos_id;
