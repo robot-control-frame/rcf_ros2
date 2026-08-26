@@ -31,10 +31,6 @@ constexpr bool is_control_mode_value(double value, ControlMode mode) { return va
 
 inline ControlMode to_control_mode(double value) {
   const auto int_value = static_cast<int>(value);
-  if (value != static_cast<double>(int_value)) {
-    return ControlMode::UNKNOWN;
-  }
-
   switch (int_value) {
     case -1:
       return ControlMode::BEGIN;
