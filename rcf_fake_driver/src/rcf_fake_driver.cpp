@@ -7,7 +7,7 @@
 namespace rcf_fake_driver {
 bool RcfFakeDriver::init(std::vector<std::string> config) {
   logger_ = std::make_shared<rclcpp::Logger>(rclcpp::get_logger("RcfFakeDriver"));
-  clock_ = std::make_shared<rclcpp::Clock>(rclcpp::Clock());
+  clock_ = std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME);
   RCLCPP_INFO(get_logger(), "RcfFakeDriver init");
 
   try {

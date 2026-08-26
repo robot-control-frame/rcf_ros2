@@ -34,6 +34,7 @@
 #include "hardware_interface/system_interface.hpp"
 #include "hardware_interface/types/hardware_interface_return_values.hpp"
 #include "transmission_interface/transmission.hpp"
+#include "transmission_interface/transmission_loader.hpp"
 
 namespace rcf_standard_hardware {
 class RcfStandardHardware : public hardware_interface::SystemInterface {
@@ -110,6 +111,7 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   std::shared_ptr<rcf_standard_driver_interface::RcfStandardDriverBase> driver_;
 
   // ros2_control
+  std::shared_ptr<pluginlib::ClassLoader<transmission_interface::TransmissionLoader>> transmission_loader_;
   std::vector<std::shared_ptr<transmission_interface::Transmission>> transmissions_;
   std::vector<std::shared_ptr<rcf_joint_limits_interface::RcfJointLimits>> joint_limits_;
   std::shared_ptr<rclcpp::Publisher<control_msgs::msg::DynamicJointState>> dynamic_actuator_state_publisher_;

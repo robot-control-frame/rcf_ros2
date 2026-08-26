@@ -18,7 +18,7 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     const hardware_interface::HardwareComponentInterfaceParams& params) {
   logger_ = std::make_shared<rclcpp::Logger>(rclcpp::get_logger("RcfStandardHardware"));
   clock_ = std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME);
-
+  std::string driver_classs;
   RCLCPP_INFO(get_logger(), "RcfStandardHardware::on_init");
   if (hardware_interface::SystemInterface::on_init(params) != hardware_interface::CallbackReturn::SUCCESS) {
     return hardware_interface::CallbackReturn::ERROR;
@@ -32,6 +32,9 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
 
     rcf_std_hardware_config = YAML::LoadFile(rcf_std_hardware_config_path_);
     transmissions_config = YAML::LoadFile(transmissions_config_path_);
+
+    driver_classs = rcf_std_hardware_config["rcf_std_hardware"]["driver"]["class"].as<std::string>("");
+    RCLCPP_INFO(get_logger(), "driver_classs: %s", driver_classs.c_str());
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "Exception while reading the YAML file: %s", e.what());
     return hardware_interface::CallbackReturn::ERROR;
@@ -40,9 +43,19 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
   pluginlib::ClassLoader<rcf_standard_driver_interface::RcfStandardDriverBase> driver_loader(
       "rcf_standard_driver_interface", "rcf_standard_driver_interface::RcfStandardDriverBase");
 
+  const char* hw_debug_env = std::getenv("HW_DEBUG");
+  const std::string hw_debug_value = hw_debug_env == nullptr ? "" : hw_debug_env;
+  hw_debug_ = hw_debug_value == "1" || hw_debug_value == "true" || hw_debug_value == "TRUE" || hw_debug_value == "on" ||
+              hw_debug_value == "ON";
+  if (hw_debug_) {
+    driver_classs = "rcf_fake_driver/RcfFakeDriver";
+    RCLCPP_WARN(get_logger(), "HW_DEBUG is enabled, use fake data");
+  } else {
+    RCLCPP_INFO(get_logger(), "HW_DEBUG is disabled,use driver: %s", driver_classs.c_str());
+  }
   try {
-    RCLCPP_INFO(get_logger(), "Create driver: %s", "ubt_ecat_driver/UbtEcatDriver");
-    driver_ = driver_loader.createSharedInstance("ubt_ecat_driver/UbtEcatDriver");
+    RCLCPP_INFO(get_logger(), "Create driver: %s", driver_classs.c_str());
+    driver_ = driver_loader.createSharedInstance(driver_classs);
     std::vector<std::string> driver_config;
     driver_config.push_back(rcf_std_hardware_config_path_);
     if (!driver_->init(driver_config)) {
@@ -168,13 +181,15 @@ std::vector<hardware_interface::CommandInterface> RcfStandardHardware::export_co
 
 hardware_interface::CallbackReturn RcfStandardHardware::on_activate(const rclcpp_lifecycle::State& /*previous_state*/) {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
-  RCLCPP_INFO(get_logger(), "RcfStandardHardware::on_activate.");
+  RCLCPP_INFO(get_logger(), "===================================================.");
   hw_init_check_success_ = hardware_online_check();
   if (!hw_init_check_success_) {
     RCLCPP_ERROR(get_logger(), "Hardware online check failed.");
+    RCLCPP_INFO(get_logger(), "===================================================.");
     return hardware_interface::CallbackReturn::ERROR;
   }
   init_dynamic_actuator_state_msg();
+  RCLCPP_INFO(get_logger(), "===================================================.");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -282,13 +297,16 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
         }
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::BEGIN;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_EFFORT)) {
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode,
+                                       rcf_hardware_interface::ControlMode::MODE_EFFORT)) {
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_EFFORT;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_VELOCITY)) {
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode,
+                                       rcf_hardware_interface::ControlMode::MODE_VELOCITY)) {
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_VELOCITY;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_POSITION)) {
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode,
+                                       rcf_hardware_interface::ControlMode::MODE_POSITION)) {
         if (use_jump_command_protection_) {
           // 阶跃指令输出log
           if (act_data_vector[i]->act_type == ActType::STANDARD_REVOLUTE) {
@@ -322,7 +340,8 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
         }
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_POSITION;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_PVT)) {  // PVT mode
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode,
+                                       rcf_hardware_interface::ControlMode::MODE_PVT)) {  // PVT mode
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_PVT;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
       } else {
