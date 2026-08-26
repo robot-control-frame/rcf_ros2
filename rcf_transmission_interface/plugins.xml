@@ -1,8 +1,8 @@
-<library path="transmission_interface">
+<library path="rcf_transmission_interface">
   <!-- Transmission types -->
-  <class name="transmission_interface/SimpleTransmission"
-    type="transmission_interface::SimpleTransmissionLoader"
-    base_class_type="transmission_interface::TransmissionLoader">
+  <class name="rcf_transmission_interface/RcfSimpleTransmission"
+    type="rcf_transmission_interface::RcfSimpleTransmissionLoader"
+    base_class_type="rcf_transmission_interface::RcfTransmissionLoaderBase">
     <description>
       Load configuration of a simple transmission from a URDF description.
     </description>

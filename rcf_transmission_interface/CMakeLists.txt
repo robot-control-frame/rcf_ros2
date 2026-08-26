@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.16)
 project(rcf_transmission_interface LANGUAGES CXX)
 
 set(THIS_PACKAGE_INCLUDE_DEPENDS hardware_interface pluginlib rclcpp fmt
-                                 transmission_interface)
+                                 transmission_interface yaml-cpp)
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_gen_version_h REQUIRED)
@@ -19,8 +19,10 @@ target_include_directories(
 target_link_libraries(
   rcf_transmission_interface
   PUBLIC hardware_interface::hardware_interface pluginlib::pluginlib
-         rclcpp::rclcpp fmt::fmt transmission_interface::transmission_interface)
-pluginlib_export_plugin_description_file(rcf_transmission_interface plugins.xml)
+         rclcpp::rclcpp fmt::fmt transmission_interface::transmission_interface
+         yaml-cpp::yaml-cpp)
+
+pluginlib_export_plugin_description_file(transmission_interface plugins.xml)
 
 install(DIRECTORY include/ DESTINATION include/rcf_transmission_interface)
 install(
