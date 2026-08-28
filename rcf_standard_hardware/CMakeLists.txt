@@ -20,7 +20,8 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
     yaml-cpp
     realtime_tools
     control_msgs
-    std_srvs)
+    std_srvs
+    rcf_common)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)

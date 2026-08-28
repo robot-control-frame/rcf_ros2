@@ -14,6 +14,7 @@
 #include "control_msgs/msg/dynamic_joint_state.hpp"
 #include "realtime_tools/realtime_publisher.hpp"
 // rcf
+#include <rcf_common/transmission_parse.hpp>
 #include <rcf_hardware_interface/control_modes.hpp>
 #include <rcf_joint_limits_interface/rcf_joint_limits.hpp>
 #include <rcf_standard_driver_interface/rcf_standard_driver_base.hpp>
