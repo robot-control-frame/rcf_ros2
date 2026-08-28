@@ -48,7 +48,6 @@ hardware_interface::TransmissionInfo RcfSimpleTransmissionLoader::create_transmi
     act_info.name = actuator_name;
     act_info.mechanical_reduction = mechanical_reduction;
     transmission_info.actuators.push_back(act_info);
-
     return transmission_info;
   } catch (const std::exception& ex) {
     throw std::runtime_error(fmt::format("Failed to create transmission info '{}': {}", name, ex.what()));
