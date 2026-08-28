@@ -9,6 +9,7 @@
 #include <hardware_interface/hardware_info.hpp>
 #include <memory>
 #include <rclcpp/logging.hpp>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -519,7 +520,7 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
                                                                        &(act_data_iter->get()->cmd_effort));
         transmission_interface::ActuatorHandle actuator_cmd_v1_handle(act_info.name, "cmd_v1",
                                                                       &(act_data_iter->get()->cmd_v1));
-        transmission_interface::ActuatorHandle actuator_cmd_v2_handle(act_info.name, "cmd_velocity",
+        transmission_interface::ActuatorHandle actuator_cmd_v2_handle(act_info.name, "cmd_v2",
                                                                       &(act_data_iter->get()->cmd_v2));
         transmission_interface::ActuatorHandle actuator_cmd_v3_handle(act_info.name, "cmd_v3",
                                                                       &(act_data_iter->get()->cmd_v3));
@@ -551,58 +552,63 @@ bool RcfStandardHardware::setup_joint_limits(YAML::Node& transmissions_config) {
     for (auto trans : transmissions_data) {
       YAML::Node trans_config = trans.second;
       YAML::Node joint_config = trans_config["joint"];
-      auto joint_name = joint_config["name"].as<std::string>();
-      YAML::Node joint_limit_config = joint_config["limit"];
-      joint_limits::JointLimits limit;
-      if (joint_limit_config.IsNull()) {
-        RCLCPP_ERROR(get_logger(), "The joint %s does not contain limiting parameters.", joint_name.c_str());
-      } else {
-        auto lower = joint_limit_config["lower"];
-        auto upper = joint_limit_config["upper"];
-        auto velocity = joint_limit_config["velocity"];
-        auto effort = joint_limit_config["effort"];
-
-        if (lower.IsNull() or upper.IsNull()) {
-          RCLCPP_ERROR(get_logger(), "The joint %s does not contain position limiting  parameters.",
-                       joint_name.c_str());
-        } else {
-          limit.has_position_limits = true;
-          limit.min_position = lower.as<double>() + std::numeric_limits<double>::epsilon();
-          limit.max_position = upper.as<double>() - std::numeric_limits<double>::epsilon();
-        }
-        if (velocity.IsNull()) {
-          RCLCPP_ERROR(get_logger(), "The joint %s does not contain velocity limiting  parameters.",
-                       joint_name.c_str());
-        } else {
-          limit.has_velocity_limits = true;
-          limit.max_velocity = velocity.as<double>();
-        }
-
-        if (effort.IsNull()) {
-          RCLCPP_ERROR(get_logger(), "The joint %s does not contain effort limiting  parameters.", joint_name.c_str());
-        } else {
-          limit.has_effort_limits = true;
-          limit.max_effort = effort.as<double>();
-        }
+      if (!joint_config.IsMap()) {
+        throw std::runtime_error("joint config must be a map");
       }
+      for (auto joint : joint_config) {
+        auto joint_name = joint.first.as<std::string>();
+        YAML::Node joint_limit_config = joint.second["limit"];
+        joint_limits::JointLimits limit;
+        if (joint_limit_config.IsNull()) {
+          RCLCPP_ERROR(get_logger(), "The joint %s does not contain limiting parameters.", joint_name.c_str());
+        } else {
+          auto lower = joint_limit_config["lower"];
+          auto upper = joint_limit_config["upper"];
+          auto velocity = joint_limit_config["velocity"];
+          auto effort = joint_limit_config["effort"];
 
-      auto joint_data_iter = std::find_if(joint_data_vector.begin(), joint_data_vector.end(),
-                                          [joint_name](const std::shared_ptr<JointData>& ptr) {
-                                            if (!ptr) return false;
-                                            return ptr->name == joint_name;
-                                          });
+          if (lower.IsNull() or upper.IsNull()) {
+            RCLCPP_ERROR(get_logger(), "The joint %s does not contain position limiting  parameters.",
+                         joint_name.c_str());
+          } else {
+            limit.has_position_limits = true;
+            limit.min_position = lower.as<double>() + std::numeric_limits<double>::epsilon();
+            limit.max_position = upper.as<double>() - std::numeric_limits<double>::epsilon();
+          }
+          if (velocity.IsNull()) {
+            RCLCPP_ERROR(get_logger(), "The joint %s does not contain velocity limiting  parameters.",
+                         joint_name.c_str());
+          } else {
+            limit.has_velocity_limits = true;
+            limit.max_velocity = velocity.as<double>();
+          }
 
-      if (joint_data_iter != joint_data_vector.end()) {
-      } else {
-        RCLCPP_ERROR(get_logger(), "Unknown joint: %s", joint_name.c_str());
-        return false;
+          if (effort.IsNull()) {
+            RCLCPP_ERROR(get_logger(), "The joint %s does not contain effort limiting  parameters.",
+                         joint_name.c_str());
+          } else {
+            limit.has_effort_limits = true;
+            limit.max_effort = effort.as<double>();
+          }
+        }
+
+        auto joint_data_iter = std::find_if(joint_data_vector.begin(), joint_data_vector.end(),
+                                            [joint_name](const std::shared_ptr<JointData>& ptr) {
+                                              if (!ptr) return false;
+                                              return ptr->name == joint_name;
+                                            });
+
+        if (joint_data_iter == joint_data_vector.end()) {
+          RCLCPP_ERROR(get_logger(), "Unknown joint: %s", joint_name.c_str());
+          return false;
+        }
+
+        auto joint_limits = std::make_shared<rcf_joint_limits_interface::RcfJointLimits>(
+            limit, &(joint_data_iter->get()->position), &(joint_data_iter->get()->velocity),
+            &(joint_data_iter->get()->effort), &(joint_data_iter->get()->position_command),
+            &(joint_data_iter->get()->velocity_command), &(joint_data_iter->get()->effort_command));
+        joint_limits_.push_back(joint_limits);
       }
-
-      auto joint_limits = std::make_shared<rcf_joint_limits_interface::RcfJointLimits>(
-          limit, &(joint_data_iter->get()->position), &(joint_data_iter->get()->velocity),
-          &(joint_data_iter->get()->effort), &(joint_data_iter->get()->position_command),
-          &(joint_data_iter->get()->velocity_command), &(joint_data_iter->get()->effort_command));
-      joint_limits_.push_back(joint_limits);
     }
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "%s", e.what());
