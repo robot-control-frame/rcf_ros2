@@ -5,20 +5,20 @@
 #include "rcf_standard_hardware/rcf_standard_hardware.hpp"
 
 #include <cmath>
+#include <cstdlib>
 #include <hardware_interface/hardware_info.hpp>
 #include <memory>
 #include <rclcpp/logging.hpp>
+#include <stdexcept>
 #include <string>
 #include <vector>
-
-#include "rcf_transmission_interface/rcf_simple_transmission_loader.hpp"
 
 namespace rcf_standard_hardware {
 hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     const hardware_interface::HardwareComponentInterfaceParams& params) {
   logger_ = std::make_shared<rclcpp::Logger>(rclcpp::get_logger("RcfStandardHardware"));
   clock_ = std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME);
-
+  std::string driver_classs;
   RCLCPP_INFO(get_logger(), "RcfStandardHardware::on_init");
   if (hardware_interface::SystemInterface::on_init(params) != hardware_interface::CallbackReturn::SUCCESS) {
     return hardware_interface::CallbackReturn::ERROR;
@@ -32,6 +32,9 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
 
     rcf_std_hardware_config = YAML::LoadFile(rcf_std_hardware_config_path_);
     transmissions_config = YAML::LoadFile(transmissions_config_path_);
+
+    driver_classs = rcf_std_hardware_config["rcf_std_hardware"]["driver"]["class"].as<std::string>("");
+    RCLCPP_INFO(get_logger(), "driver_classs: %s", driver_classs.c_str());
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "Exception while reading the YAML file: %s", e.what());
     return hardware_interface::CallbackReturn::ERROR;
@@ -40,9 +43,22 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
   pluginlib::ClassLoader<rcf_standard_driver_interface::RcfStandardDriverBase> driver_loader(
       "rcf_standard_driver_interface", "rcf_standard_driver_interface::RcfStandardDriverBase");
 
+  transmission_loader_ =
+      std::make_shared<pluginlib::ClassLoader<rcf_transmission_interface::RcfTransmissionLoaderBase>>(
+          "rcf_transmission_interface", "rcf_transmission_interface::RcfTransmissionLoaderBase");
+  const char* hw_debug_env = std::getenv("HW_DEBUG");
+  const std::string hw_debug_value = hw_debug_env == nullptr ? "" : hw_debug_env;
+  hw_debug_ = hw_debug_value == "1" || hw_debug_value == "true" || hw_debug_value == "TRUE" || hw_debug_value == "on" ||
+              hw_debug_value == "ON";
+  if (hw_debug_) {
+    driver_classs = "rcf_fake_driver/RcfFakeDriver";
+    RCLCPP_WARN(get_logger(), "HW_DEBUG is enabled, use fake data");
+  } else {
+    RCLCPP_INFO(get_logger(), "HW_DEBUG is disabled,use driver: %s", driver_classs.c_str());
+  }
   try {
-    RCLCPP_INFO(get_logger(), "Create driver: %s", "ubt_ecat_driver/UbtEcatDriver");
-    driver_ = driver_loader.createSharedInstance("ubt_ecat_driver/UbtEcatDriver");
+    RCLCPP_INFO(get_logger(), "Create driver: %s", driver_classs.c_str());
+    driver_ = driver_loader.createSharedInstance(driver_classs);
     std::vector<std::string> driver_config;
     driver_config.push_back(rcf_std_hardware_config_path_);
     if (!driver_->init(driver_config)) {
@@ -168,13 +184,15 @@ std::vector<hardware_interface::CommandInterface> RcfStandardHardware::export_co
 
 hardware_interface::CallbackReturn RcfStandardHardware::on_activate(const rclcpp_lifecycle::State& /*previous_state*/) {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
-  RCLCPP_INFO(get_logger(), "RcfStandardHardware::on_activate.");
+  RCLCPP_INFO(get_logger(), "===================================================.");
   hw_init_check_success_ = hardware_online_check();
   if (!hw_init_check_success_) {
     RCLCPP_ERROR(get_logger(), "Hardware online check failed.");
+    RCLCPP_INFO(get_logger(), "===================================================.");
     return hardware_interface::CallbackReturn::ERROR;
   }
   init_dynamic_actuator_state_msg();
+  RCLCPP_INFO(get_logger(), "===================================================.");
   return hardware_interface::CallbackReturn::SUCCESS;
 }
 
@@ -282,13 +300,16 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
         }
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::BEGIN;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_EFFORT)) {
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode,
+                                       rcf_hardware_interface::ControlMode::MODE_EFFORT)) {
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_EFFORT;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_VELOCITY)) {
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode,
+                                       rcf_hardware_interface::ControlMode::MODE_VELOCITY)) {
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_VELOCITY;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_POSITION)) {
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode,
+                                       rcf_hardware_interface::ControlMode::MODE_POSITION)) {
         if (use_jump_command_protection_) {
           // 阶跃指令输出log
           if (act_data_vector[i]->act_type == ActType::STANDARD_REVOLUTE) {
@@ -322,7 +343,8 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
         }
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_POSITION;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
-      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::MODE_PVT)) {  // PVT mode
+      } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode,
+                                       rcf_hardware_interface::ControlMode::MODE_PVT)) {  // PVT mode
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::MODE_PVT;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
       } else {
@@ -402,8 +424,6 @@ bool RcfStandardHardware::setup_motors(YAML::Node& hw_config) {
 }
 
 bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
-  auto rcf_simple_transmission_loader = rcf_transmission_interface::RcfSimpleTransmissionLoader();
-
   try {
     auto transmissions_data = transmissions_config["transmissions"];
     for (auto trans : transmissions_data) {
@@ -411,38 +431,29 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
       std::string name = trans.first.as<std::string>();
       YAML::Node trans_config = trans.second;
       std::string type = trans_config["type"].as<std::string>();
-      if (type == "SimpleTransmission" or type == "simple_transmission") {
-        hardware_interface::TransmissionInfo transmission_info;
-        transmission_info.name = name;
-        transmission_info.type = type;
 
-        hardware_interface::JointInfo joint_info;
-        YAML::Node trans_joint_config = trans_config["joint"];
-        joint_info.name = trans_joint_config["name"].as<std::string>();
-        joint_info.offset = trans_joint_config["offset"].as<double>(0.0);
-        transmission_info.joints.push_back(joint_info);
-        hardware_interface::ActuatorInfo act_info;
-        YAML::Node trans_act_config = trans_config["actuator"];
-        act_info.name = trans_act_config["name"].as<std::string>();
+      auto loader = transmission_loader_->createSharedInstance(type);
+      auto transmission_info = loader->create_transmission_info(name, trans_config);
 
+      for (auto& actuator : transmission_info.actuators) {
         auto act_data_iter = std::find_if(act_data_vector.begin(), act_data_vector.end(),
-                                          [act_info](const std::shared_ptr<ActData>& ptr) {
+                                          [actuator](const std::shared_ptr<ActData>& ptr) {
                                             if (!ptr) return false;
-                                            return ptr->name == act_info.name;
+                                            return ptr->name == actuator.name;
                                           });
 
-        if (act_data_iter != act_data_vector.end()) {
-        } else {
-          RCLCPP_ERROR(get_logger(), "Unknown actuator: %s", act_info.name.c_str());
+        if (act_data_iter == act_data_vector.end()) {
+          RCLCPP_ERROR(get_logger(), "Unknown actuator: %s", actuator.name.c_str());
           return false;
         }
+      }
 
-        act_info.mechanical_reduction = trans_act_config["mechanical_reduction"].as<double>(1.0);
-        transmission_info.actuators.push_back(act_info);
-        transmission = rcf_simple_transmission_loader.load(transmission_info);
+      transmission = loader->load(transmission_info);
 
-        std::vector<transmission_interface::JointHandle> joint_handles;
-        std::vector<transmission_interface::ActuatorHandle> actuator_handles;
+      std::vector<transmission_interface::JointHandle> joint_handles;
+      std::vector<transmission_interface::ActuatorHandle> actuator_handles;
+
+      for (auto& joint_info : transmission_info.joints) {
         auto joint_interface_data = std::make_shared<JointData>();
         joint_interface_data->name = joint_info.name;
         joint_interface_data->position = 0.0;
@@ -484,6 +495,14 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
         joint_handles.push_back(joint_cmd_v1_handle);
         joint_handles.push_back(joint_cmd_v2_handle);
         joint_handles.push_back(joint_cmd_v3_handle);
+      }
+
+      for (auto& act_info : transmission_info.actuators) {
+        auto act_data_iter = std::find_if(act_data_vector.begin(), act_data_vector.end(),
+                                          [act_info](const std::shared_ptr<ActData>& ptr) {
+                                            if (!ptr) return false;
+                                            return ptr->name == act_info.name;
+                                          });
 
         transmission_interface::ActuatorHandle actuator_state_pos_handle(act_info.name, "position",
                                                                          &(act_data_iter->get()->pos));
@@ -501,7 +520,7 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
                                                                        &(act_data_iter->get()->cmd_effort));
         transmission_interface::ActuatorHandle actuator_cmd_v1_handle(act_info.name, "cmd_v1",
                                                                       &(act_data_iter->get()->cmd_v1));
-        transmission_interface::ActuatorHandle actuator_cmd_v2_handle(act_info.name, "cmd_velocity",
+        transmission_interface::ActuatorHandle actuator_cmd_v2_handle(act_info.name, "cmd_v2",
                                                                       &(act_data_iter->get()->cmd_v2));
         transmission_interface::ActuatorHandle actuator_cmd_v3_handle(act_info.name, "cmd_v3",
                                                                       &(act_data_iter->get()->cmd_v3));
@@ -515,8 +534,9 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
         actuator_handles.push_back(actuator_cmd_v1_handle);
         actuator_handles.push_back(actuator_cmd_v2_handle);
         actuator_handles.push_back(actuator_cmd_v3_handle);
-        transmission->configure(joint_handles, actuator_handles);
       }
+      transmission->configure(joint_handles, actuator_handles);
+
       transmissions_.push_back(transmission);
     }
   } catch (const std::exception& e) {
@@ -532,58 +552,63 @@ bool RcfStandardHardware::setup_joint_limits(YAML::Node& transmissions_config) {
     for (auto trans : transmissions_data) {
       YAML::Node trans_config = trans.second;
       YAML::Node joint_config = trans_config["joint"];
-      auto joint_name = joint_config["name"].as<std::string>();
-      YAML::Node joint_limit_config = joint_config["limit"];
-      joint_limits::JointLimits limit;
-      if (joint_limit_config.IsNull()) {
-        RCLCPP_ERROR(get_logger(), "The joint %s does not contain limiting parameters.", joint_name.c_str());
-      } else {
-        auto lower = joint_limit_config["lower"];
-        auto upper = joint_limit_config["upper"];
-        auto velocity = joint_limit_config["velocity"];
-        auto effort = joint_limit_config["effort"];
-
-        if (lower.IsNull() or upper.IsNull()) {
-          RCLCPP_ERROR(get_logger(), "The joint %s does not contain position limiting  parameters.",
-                       joint_name.c_str());
-        } else {
-          limit.has_position_limits = true;
-          limit.min_position = lower.as<double>() + std::numeric_limits<double>::epsilon();
-          limit.max_position = upper.as<double>() - std::numeric_limits<double>::epsilon();
-        }
-        if (velocity.IsNull()) {
-          RCLCPP_ERROR(get_logger(), "The joint %s does not contain velocity limiting  parameters.",
-                       joint_name.c_str());
-        } else {
-          limit.has_velocity_limits = true;
-          limit.max_velocity = velocity.as<double>();
-        }
-
-        if (effort.IsNull()) {
-          RCLCPP_ERROR(get_logger(), "The joint %s does not contain effort limiting  parameters.", joint_name.c_str());
-        } else {
-          limit.has_effort_limits = true;
-          limit.max_effort = effort.as<double>();
-        }
+      if (!joint_config.IsMap()) {
+        throw std::runtime_error("joint config must be a map");
       }
+      for (auto joint : joint_config) {
+        auto joint_name = joint.first.as<std::string>();
+        YAML::Node joint_limit_config = joint.second["limit"];
+        joint_limits::JointLimits limit;
+        if (joint_limit_config.IsNull()) {
+          RCLCPP_ERROR(get_logger(), "The joint %s does not contain limiting parameters.", joint_name.c_str());
+        } else {
+          auto lower = joint_limit_config["lower"];
+          auto upper = joint_limit_config["upper"];
+          auto velocity = joint_limit_config["velocity"];
+          auto effort = joint_limit_config["effort"];
 
-      auto joint_data_iter = std::find_if(joint_data_vector.begin(), joint_data_vector.end(),
-                                          [joint_name](const std::shared_ptr<JointData>& ptr) {
-                                            if (!ptr) return false;
-                                            return ptr->name == joint_name;
-                                          });
+          if (lower.IsNull() or upper.IsNull()) {
+            RCLCPP_ERROR(get_logger(), "The joint %s does not contain position limiting  parameters.",
+                         joint_name.c_str());
+          } else {
+            limit.has_position_limits = true;
+            limit.min_position = lower.as<double>() + std::numeric_limits<double>::epsilon();
+            limit.max_position = upper.as<double>() - std::numeric_limits<double>::epsilon();
+          }
+          if (velocity.IsNull()) {
+            RCLCPP_ERROR(get_logger(), "The joint %s does not contain velocity limiting  parameters.",
+                         joint_name.c_str());
+          } else {
+            limit.has_velocity_limits = true;
+            limit.max_velocity = velocity.as<double>();
+          }
 
-      if (joint_data_iter != joint_data_vector.end()) {
-      } else {
-        RCLCPP_ERROR(get_logger(), "Unknown joint: %s", joint_name.c_str());
-        return false;
+          if (effort.IsNull()) {
+            RCLCPP_ERROR(get_logger(), "The joint %s does not contain effort limiting  parameters.",
+                         joint_name.c_str());
+          } else {
+            limit.has_effort_limits = true;
+            limit.max_effort = effort.as<double>();
+          }
+        }
+
+        auto joint_data_iter = std::find_if(joint_data_vector.begin(), joint_data_vector.end(),
+                                            [joint_name](const std::shared_ptr<JointData>& ptr) {
+                                              if (!ptr) return false;
+                                              return ptr->name == joint_name;
+                                            });
+
+        if (joint_data_iter == joint_data_vector.end()) {
+          RCLCPP_ERROR(get_logger(), "Unknown joint: %s", joint_name.c_str());
+          return false;
+        }
+
+        auto joint_limits = std::make_shared<rcf_joint_limits_interface::RcfJointLimits>(
+            limit, &(joint_data_iter->get()->position), &(joint_data_iter->get()->velocity),
+            &(joint_data_iter->get()->effort), &(joint_data_iter->get()->position_command),
+            &(joint_data_iter->get()->velocity_command), &(joint_data_iter->get()->effort_command));
+        joint_limits_.push_back(joint_limits);
       }
-
-      auto joint_limits = std::make_shared<rcf_joint_limits_interface::RcfJointLimits>(
-          limit, &(joint_data_iter->get()->position), &(joint_data_iter->get()->velocity),
-          &(joint_data_iter->get()->effort), &(joint_data_iter->get()->position_command),
-          &(joint_data_iter->get()->velocity_command), &(joint_data_iter->get()->effort_command));
-      joint_limits_.push_back(joint_limits);
     }
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "%s", e.what());
