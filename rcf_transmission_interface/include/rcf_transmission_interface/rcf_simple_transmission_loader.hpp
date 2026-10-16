@@ -6,12 +6,11 @@
 
 #include <memory>
 
-#include "rcf_transmission_interface/rcf_transmission_loader_base.hpp"
+#include "transmission_interface/transmission_loader.hpp"
 namespace rcf_transmission_interface {
 
-class RcfSimpleTransmissionLoader : public RcfTransmissionLoaderBase {
+class RcfSimpleTransmissionLoader : public transmission_interface::TransmissionLoader {
  public:
-  hardware_interface::TransmissionInfo create_transmission_info(const std::string name, YAML::Node& config) override;
   std::shared_ptr<transmission_interface::Transmission> load(
       const hardware_interface::TransmissionInfo& transmission_info) override;
 };

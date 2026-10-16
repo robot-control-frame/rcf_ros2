@@ -2,7 +2,7 @@
   <!-- Transmission types -->
   <class name="rcf_transmission_interface/RcfSimpleTransmission"
     type="rcf_transmission_interface::RcfSimpleTransmissionLoader"
-    base_class_type="rcf_transmission_interface::RcfTransmissionLoaderBase">
+    base_class_type="transmission_interface::TransmissionLoader">
     <description>
       Load configuration of a simple transmission from a URDF description.
     </description>

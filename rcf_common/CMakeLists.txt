@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(rcf_common LANGUAGES CXX)
 
-set(THIS_PACKAGE_INCLUDE_DEPENDS rclcpp Eigen3 geometry_msgs joint_limits)
+set(THIS_PACKAGE_INCLUDE_DEPENDS rclcpp Eigen3 geometry_msgs joint_limits
+                                 hardware_interface)
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_cmake_gen_version_h REQUIRED)
@@ -14,8 +15,9 @@ add_library(${PROJECT_NAME} SHARED ${source})
 target_include_directories(
   ${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
                          $<INSTALL_INTERFACE:include>)
-target_link_libraries(${PROJECT_NAME} rclcpp::rclcpp Eigen3::Eigen
-                      geometry_msgs::geometry_msgs joint_limits::joint_limits)
+target_link_libraries(
+  ${PROJECT_NAME} rclcpp::rclcpp Eigen3::Eigen geometry_msgs::geometry_msgs
+  joint_limits::joint_limits hardware_interface::hardware_interface)
 
 install(DIRECTORY include/ DESTINATION include/rcf_common)
 install(
