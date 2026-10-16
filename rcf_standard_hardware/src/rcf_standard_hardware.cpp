@@ -43,9 +43,8 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
   pluginlib::ClassLoader<rcf_standard_driver_interface::RcfStandardDriverBase> driver_loader(
       "rcf_standard_driver_interface", "rcf_standard_driver_interface::RcfStandardDriverBase");
 
-  transmission_loader_ =
-      std::make_shared<pluginlib::ClassLoader<transmission_interface::TransmissionLoader>>(
-          "transmission_interface", "transmission_interface::TransmissionLoader");
+  transmission_loader_ = std::make_shared<pluginlib::ClassLoader<transmission_interface::TransmissionLoader>>(
+      "transmission_interface", "transmission_interface::TransmissionLoader");
   const char* hw_debug_env = std::getenv("HW_DEBUG");
   const std::string hw_debug_value = hw_debug_env == nullptr ? "" : hw_debug_env;
   hw_debug_ = hw_debug_value == "1" || hw_debug_value == "true" || hw_debug_value == "TRUE" || hw_debug_value == "on" ||
