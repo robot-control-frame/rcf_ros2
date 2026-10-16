@@ -22,7 +22,7 @@ target_link_libraries(
          rclcpp::rclcpp fmt::fmt transmission_interface::transmission_interface
          yaml-cpp::yaml-cpp)
 
-pluginlib_export_plugin_description_file(rcf_transmission_interface plugins.xml)
+pluginlib_export_plugin_description_file(transmission_interface plugins.xml)
 
 install(DIRECTORY include/ DESTINATION include/rcf_transmission_interface)
 install(

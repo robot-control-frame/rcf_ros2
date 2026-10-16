@@ -44,8 +44,8 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
       "rcf_standard_driver_interface", "rcf_standard_driver_interface::RcfStandardDriverBase");
 
   transmission_loader_ =
-      std::make_shared<pluginlib::ClassLoader<rcf_transmission_interface::RcfTransmissionLoaderBase>>(
-          "rcf_transmission_interface", "rcf_transmission_interface::RcfTransmissionLoaderBase");
+      std::make_shared<pluginlib::ClassLoader<transmission_interface::TransmissionLoader>>(
+          "transmission_interface", "transmission_interface::TransmissionLoader");
   const char* hw_debug_env = std::getenv("HW_DEBUG");
   const std::string hw_debug_value = hw_debug_env == nullptr ? "" : hw_debug_env;
   hw_debug_ = hw_debug_value == "1" || hw_debug_value == "true" || hw_debug_value == "TRUE" || hw_debug_value == "on" ||
@@ -425,15 +425,19 @@ bool RcfStandardHardware::setup_motors(YAML::Node& hw_config) {
 
 bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
   try {
+    rcf_common::TransmissionParse transmission_parse;
+    if (!transmission_parse.parse(transmissions_config)) {
+      RCLCPP_ERROR(get_logger(), "Failed to parse transmission config");
+      return false;
+    }
+
     auto transmissions_data = transmissions_config["transmissions"];
     for (auto trans : transmissions_data) {
       std::shared_ptr<transmission_interface::Transmission> transmission;
       std::string name = trans.first.as<std::string>();
-      YAML::Node trans_config = trans.second;
-      std::string type = trans_config["type"].as<std::string>();
+      auto transmission_info = transmission_parse.get_transmission_info(name);
 
-      auto loader = transmission_loader_->createSharedInstance(type);
-      auto transmission_info = loader->create_transmission_info(name, trans_config);
+      auto loader = transmission_loader_->createSharedInstance(transmission_info.type);
 
       for (auto& actuator : transmission_info.actuators) {
         auto act_data_iter = std::find_if(act_data_vector.begin(), act_data_vector.end(),
