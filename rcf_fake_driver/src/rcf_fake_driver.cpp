@@ -2,8 +2,9 @@
  * Copyright (c) 2026/04/21, Liao LunJia.
  * All rights reserved.
  *******************************************************************************/
-#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <rcf_fake_driver/rcf_fake_driver.h>
+
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 namespace rcf_fake_driver {
 bool RcfFakeDriver::init(std::vector<std::string> config) {

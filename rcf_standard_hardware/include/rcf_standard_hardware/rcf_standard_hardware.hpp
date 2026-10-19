@@ -125,6 +125,8 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   rclcpp::Time last_check_hw_time_;
   bool check_timeout_{false};
   bool hw_init_check_success_{false};
+
+  rcf_common::TransmissionParse transmission_parse_;
 };
 
 }  // namespace rcf_standard_hardware
