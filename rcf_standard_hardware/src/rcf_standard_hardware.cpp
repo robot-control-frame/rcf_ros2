@@ -9,7 +9,6 @@
 #include <hardware_interface/hardware_info.hpp>
 #include <memory>
 #include <rclcpp/logging.hpp>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -59,7 +58,15 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     RCLCPP_INFO(get_logger(), "Create driver: %s", driver_classs.c_str());
     driver_ = driver_loader.createSharedInstance(driver_classs);
     std::vector<std::string> driver_config;
-    driver_config.push_back(rcf_std_hardware_config_path_);
+    auto driver_cfg_node = rcf_std_hardware_config["rcf_std_hardware"]["driver"]["config"];
+    if (driver_cfg_node && driver_cfg_node.IsSequence() && driver_cfg_node.size() > 0) {
+      for (const auto& item : driver_cfg_node) {
+        driver_config.push_back(item.as<std::string>());
+      }
+    } else {
+      RCLCPP_ERROR(get_logger(), "Driver config is not a sequence.");
+      return hardware_interface::CallbackReturn::ERROR;
+    }
     if (!driver_->init(driver_config)) {
       RCLCPP_ERROR(get_logger(), "Driver init failed.");
       return hardware_interface::CallbackReturn::ERROR;

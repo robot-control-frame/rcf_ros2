@@ -2,6 +2,7 @@
  * Copyright (c) 2026/04/21, Liao LunJia.
  * All rights reserved.
  *******************************************************************************/
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <rcf_fake_driver/rcf_fake_driver.h>
 
 namespace rcf_fake_driver {
@@ -10,8 +11,19 @@ bool RcfFakeDriver::init(std::vector<std::string> config) {
   clock_ = std::make_shared<rclcpp::Clock>(RCL_STEADY_TIME);
   RCLCPP_INFO(get_logger(), "RcfFakeDriver init");
 
+  if (config.size() < 2) {
+    RCLCPP_ERROR(get_logger(), "RcfFakeDriver expects config: [package_name, relative_config_dir]");
+    return false;
+  }
+
   try {
-    YAML::Node hw_config = YAML::LoadFile(config[0]);
+    const std::string config_package_path = ament_index_cpp::get_package_share_directory(config[0]);
+    const std::string hw_config_path = config_package_path + "/" + config[1] + "/rcf_std_hardware.yaml";
+    const std::string sim_driver_config_path = config_package_path + "/" + config[1] + "/sim_driver.yaml";
+    RCLCPP_INFO(get_logger(), "hw_config_path: %s", hw_config_path.c_str());
+    RCLCPP_INFO(get_logger(), "sim_driver_config_path: %s", sim_driver_config_path.c_str());
+
+    YAML::Node hw_config = YAML::LoadFile(hw_config_path);
     auto actuators_config = hw_config["rcf_std_hardware"]["actuators"];
     for (auto motor : actuators_config) {
       std::string name = motor.first.as<std::string>();
@@ -26,25 +38,29 @@ bool RcfFakeDriver::init(std::vector<std::string> config) {
       id2servo_commands_.insert({id, servo_command});
     }
 
-    auto imus_config = hw_config["rcf_std_hardware"]["imus"];
-    for (auto imu : imus_config) {
-      YAML::Node imu_config = imu.second;
-      uint16_t id = imu_config["id"].as<uint16_t>();
-      rcf_standard_driver_interface::Imu imu_state;
-      imu_state.id = id;
-      imu_states_.emplace_back(imu_state);
+    if (hw_config["rcf_std_hardware"]["imus"]) {
+      auto imus_config = hw_config["rcf_std_hardware"]["imus"];
+      for (auto imu : imus_config) {
+        YAML::Node imu_config = imu.second;
+        uint16_t id = imu_config["id"].as<uint16_t>();
+        rcf_standard_driver_interface::Imu imu_state;
+        imu_state.id = id;
+        imu_states_.emplace_back(imu_state);
+      }
     }
 
-    auto fts_config = hw_config["rcf_std_hardware"]["force_torque_sensors"];
-    for (auto ft : fts_config) {
-      YAML::Node ft_config = ft.second;
-      uint16_t id = ft_config["id"].as<uint16_t>();
-      rcf_standard_driver_interface::ForceTorque ft_state;
-      ft_state.id = id;
-      ft_states_.emplace_back(ft_state);
+    if (hw_config["rcf_std_hardware"]["force_torque_sensors"]) {
+      auto fts_config = hw_config["rcf_std_hardware"]["force_torque_sensors"];
+      for (auto ft : fts_config) {
+        YAML::Node ft_config = ft.second;
+        uint16_t id = ft_config["id"].as<uint16_t>();
+        rcf_standard_driver_interface::ForceTorque ft_state;
+        ft_state.id = id;
+        ft_states_.emplace_back(ft_state);
+      }
     }
 
-  } catch (YAML::Exception& e) {
+  } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "Failed to load config: %s", e.what());
     return false;
   }
