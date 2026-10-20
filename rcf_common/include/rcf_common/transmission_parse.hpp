@@ -3,7 +3,6 @@
 
 #include <hardware_interface/hardware_info.hpp>
 #include <joint_limits/joint_limits.hpp>
-#include <limits>
 #include <string>
 #include <unordered_map>
 
