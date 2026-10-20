@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_definitions(-Wall -Werror -Wno-enum-compare)
 
 find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rcf_standard_driver_interface REQUIRED)
@@ -20,7 +21,7 @@ target_include_directories(
   ${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
                          $<INSTALL_INTERFACE:include>)
 target_link_libraries(${PROJECT_NAME} rclcpp::rclcpp yaml-cpp::yaml-cpp)
-ament_target_dependencies(${PROJECT_NAME} pluginlib
+ament_target_dependencies(${PROJECT_NAME} ament_index_cpp pluginlib
                           rcf_standard_driver_interface)
 
 install(DIRECTORY include/ DESTINATION include)

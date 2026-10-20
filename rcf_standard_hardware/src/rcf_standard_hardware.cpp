@@ -9,7 +9,6 @@
 #include <hardware_interface/hardware_info.hpp>
 #include <memory>
 #include <rclcpp/logging.hpp>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -59,7 +58,15 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     RCLCPP_INFO(get_logger(), "Create driver: %s", driver_classs.c_str());
     driver_ = driver_loader.createSharedInstance(driver_classs);
     std::vector<std::string> driver_config;
-    driver_config.push_back(rcf_std_hardware_config_path_);
+    auto driver_cfg_node = rcf_std_hardware_config["rcf_std_hardware"]["driver"]["config"];
+    if (driver_cfg_node && driver_cfg_node.IsSequence() && driver_cfg_node.size() > 0) {
+      for (const auto& item : driver_cfg_node) {
+        driver_config.push_back(item.as<std::string>());
+      }
+    } else {
+      RCLCPP_ERROR(get_logger(), "Driver config is not a sequence.");
+      return hardware_interface::CallbackReturn::ERROR;
+    }
     if (!driver_->init(driver_config)) {
       RCLCPP_ERROR(get_logger(), "Driver init failed.");
       return hardware_interface::CallbackReturn::ERROR;
@@ -67,6 +74,10 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
 
   } catch (pluginlib::PluginlibException& ex) {
     RCLCPP_ERROR(get_logger(), "Failed to create driver: %s", ex.what());
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+  if (!transmission_parse_.parse(transmissions_config)) {
+    RCLCPP_ERROR(get_logger(), "Parse transmissions config FAILURE");
     return hardware_interface::CallbackReturn::ERROR;
   }
 
@@ -82,6 +93,9 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
     RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup JOINT LIMITS FAILURE");
     return hardware_interface::CallbackReturn::ERROR;
   }
+  transmission_parse_.print_transmission_info();
+  transmission_parse_.print_joint_limits();
+
   if (!setup_imus(rcf_std_hardware_config)) {
     RCLCPP_ERROR(get_logger(), "RcfStandardHardware Setup IMU FAILURE");
     return hardware_interface::CallbackReturn::ERROR;
@@ -424,17 +438,10 @@ bool RcfStandardHardware::setup_motors(YAML::Node& hw_config) {
 
 bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
   try {
-    rcf_common::TransmissionParse transmission_parse;
-    if (!transmission_parse.parse(transmissions_config)) {
-      RCLCPP_ERROR(get_logger(), "Failed to parse transmission config");
-      return false;
-    }
+    auto all_transmissions_info = transmission_parse_.get_transmissions();
 
-    auto transmissions_data = transmissions_config["transmissions"];
-    for (auto trans : transmissions_data) {
+    for (auto transmission_info : all_transmissions_info) {
       std::shared_ptr<transmission_interface::Transmission> transmission;
-      std::string name = trans.first.as<std::string>();
-      auto transmission_info = transmission_parse.get_transmission_info(name);
 
       auto loader = transmission_loader_->createSharedInstance(transmission_info.type);
 
@@ -551,21 +558,13 @@ bool RcfStandardHardware::setup_transmission(YAML::Node& transmissions_config) {
 
 bool RcfStandardHardware::setup_joint_limits(YAML::Node& transmissions_config) {
   try {
-    auto transmissions_data = transmissions_config["transmissions"];
-    rcf_common::TransmissionParse transmission_parse;
-    if (!transmission_parse.parse(transmissions_config)) {
-      RCLCPP_ERROR(get_logger(), "Failed to parse transmission config");
-      return false;
-    }
-
     for (auto& joint : joint_data_vector) {
-      auto limit = transmission_parse.get_joint_limits(joint->name);
+      auto limit = transmission_parse_.get_joint_limits(joint->name);
       auto joint_limits = std::make_shared<rcf_joint_limits_interface::RcfJointLimits>(
           limit, &(joint->position), &(joint->velocity), &(joint->effort), &(joint->position_command),
           &(joint->velocity_command), &(joint->effort_command));
       joint_limits_.push_back(joint_limits);
     }
-
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "%s", e.what());
     return false;
