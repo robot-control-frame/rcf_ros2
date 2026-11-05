@@ -122,6 +122,9 @@ class RcfStandardHardware : public hardware_interface::SystemInterface {
   std::atomic<bool> servo_init_{false};
   bool use_jump_command_protection_{true};
   double timeout_threshold_{0.1};
+  double actuator_state_publish_rate_{50.0};
+  double actuator_state_publish_period_{0.02};
+  double actuator_state_time_since_last_publish_{0.0};
   rclcpp::Time last_check_hw_time_;
   bool check_timeout_{false};
   bool hw_init_check_success_{false};
