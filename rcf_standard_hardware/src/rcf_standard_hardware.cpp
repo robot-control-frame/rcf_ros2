@@ -377,26 +377,34 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
     driver_->set_servo_command(all_servo_cmd);
   }
 
-  dynamic_actuator_state_msg_.header.stamp = get_clock()->now();
-  for (size_t i = 0; i < act_data_vector.size(); i++) {
-    auto& act_data = act_data_vector[i];
-    dynamic_actuator_state_msg_.interface_values[i].values[0] = act_data->pos_raw;
-    dynamic_actuator_state_msg_.interface_values[i].values[1] = act_data->q_circle;
-    dynamic_actuator_state_msg_.interface_values[i].values[2] = act_data->pos;
-    dynamic_actuator_state_msg_.interface_values[i].values[3] = act_data->vel;
-    dynamic_actuator_state_msg_.interface_values[i].values[4] = act_data->effort;
-    dynamic_actuator_state_msg_.interface_values[i].values[5] = act_data->ctrl_mode;
-    dynamic_actuator_state_msg_.interface_values[i].values[6] = act_data->cmd_pos;
-    dynamic_actuator_state_msg_.interface_values[i].values[7] = act_data->cmd_vel;
-    dynamic_actuator_state_msg_.interface_values[i].values[8] = act_data->cmd_effort;
-    dynamic_actuator_state_msg_.interface_values[i].values[9] = act_data->cmd_v1;
-    dynamic_actuator_state_msg_.interface_values[i].values[10] = act_data->cmd_v2;
-    dynamic_actuator_state_msg_.interface_values[i].values[11] = act_data->cmd_v3;
-    dynamic_actuator_state_msg_.interface_values[i].values[12] = act_data->cur;
-    dynamic_actuator_state_msg_.interface_values[i].values[13] = act_data->status;
-    dynamic_actuator_state_msg_.interface_values[i].values[14] = act_data->temperature;
+  actuator_state_time_since_last_publish_ += period.seconds();
+  const bool should_publish_actuator_state =
+      actuator_state_publish_rate_ <= 0.0 ||
+      actuator_state_time_since_last_publish_ >= actuator_state_publish_period_;
+  if (should_publish_actuator_state) {
+    dynamic_actuator_state_msg_.header.stamp = get_clock()->now();
+    for (size_t i = 0; i < act_data_vector.size(); i++) {
+      auto& act_data = act_data_vector[i];
+      dynamic_actuator_state_msg_.interface_values[i].values[0] = act_data->pos_raw;
+      dynamic_actuator_state_msg_.interface_values[i].values[1] = act_data->q_circle;
+      dynamic_actuator_state_msg_.interface_values[i].values[2] = act_data->pos;
+      dynamic_actuator_state_msg_.interface_values[i].values[3] = act_data->vel;
+      dynamic_actuator_state_msg_.interface_values[i].values[4] = act_data->effort;
+      dynamic_actuator_state_msg_.interface_values[i].values[5] = act_data->ctrl_mode;
+      dynamic_actuator_state_msg_.interface_values[i].values[6] = act_data->cmd_pos;
+      dynamic_actuator_state_msg_.interface_values[i].values[7] = act_data->cmd_vel;
+      dynamic_actuator_state_msg_.interface_values[i].values[8] = act_data->cmd_effort;
+      dynamic_actuator_state_msg_.interface_values[i].values[9] = act_data->cmd_v1;
+      dynamic_actuator_state_msg_.interface_values[i].values[10] = act_data->cmd_v2;
+      dynamic_actuator_state_msg_.interface_values[i].values[11] = act_data->cmd_v3;
+      dynamic_actuator_state_msg_.interface_values[i].values[12] = act_data->cur;
+      dynamic_actuator_state_msg_.interface_values[i].values[13] = act_data->status;
+      dynamic_actuator_state_msg_.interface_values[i].values[14] = act_data->temperature;
+    }
+    if (realtime_dynamic_actuator_state_publisher_->try_publish(dynamic_actuator_state_msg_)) {
+      actuator_state_time_since_last_publish_ = 0.0;
+    }
   }
-  realtime_dynamic_actuator_state_publisher_->try_publish(dynamic_actuator_state_msg_);
   return hardware_interface::return_type::OK;
 }
 
@@ -624,6 +632,19 @@ bool RcfStandardHardware::setup_check_timeout(YAML::Node& hw_config) {
     auto standard_hardware_data = hw_config["rcf_std_hardware"];
     timeout_threshold_ = standard_hardware_data["timeout_threshold"].as<double>(0.1);
     check_timeout_ = standard_hardware_data["check_timeout"].as<bool>(true);
+    use_jump_command_protection_ = standard_hardware_data["use_jump_command_protection"].as<bool>(true);
+    actuator_state_publish_rate_ = standard_hardware_data["actuator_state_publish_rate"].as<double>(50.0);
+    if (actuator_state_publish_rate_ > 0.0) {
+      actuator_state_publish_period_ = 1.0 / actuator_state_publish_rate_;
+    } else {
+      // <=0 表示不限频，每个 write 周期都发布
+      actuator_state_publish_period_ = 0.0;
+    }
+    RCLCPP_INFO(get_logger(),
+                "timeout_threshold: %.3f, check_timeout: %s, use_jump_command_protection: %s, "
+                "actuator_state_publish_rate: %.1f",
+                timeout_threshold_, check_timeout_ ? "true" : "false",
+                use_jump_command_protection_ ? "true" : "false", actuator_state_publish_rate_);
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "%s", e.what());
     return false;
