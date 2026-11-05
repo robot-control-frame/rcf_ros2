@@ -561,8 +561,8 @@ bool RcfStandardHardware::setup_joint_limits(YAML::Node& transmissions_config) {
     for (auto& joint : joint_data_vector) {
       auto limit = transmission_parse_.get_joint_limits(joint->name);
       auto joint_limits = std::make_shared<rcf_joint_limits_interface::RcfJointLimits>(
-          limit, &(joint->position), &(joint->velocity), &(joint->effort), &(joint->position_command),
-          &(joint->velocity_command), &(joint->effort_command));
+          limit, &(joint->position), &(joint->velocity), &(joint->effort), &(joint->control_mode),
+          &(joint->position_command), &(joint->velocity_command), &(joint->effort_command));
       joint_limits_.push_back(joint_limits);
     }
   } catch (const std::exception& e) {
