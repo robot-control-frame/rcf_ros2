@@ -7,14 +7,15 @@
 #include <cassert>
 
 #include "joint_limits/joint_limits.hpp"
+#include "rcf_hardware_interface/control_modes.hpp"
 #include "rclcpp/duration.hpp"
 namespace rcf_joint_limits_interface {
 
 class RcfJointLimits {
  public:
   explicit RcfJointLimits(const joint_limits::JointLimits& limits, double* position_ptr, double* velocity_ptr,
-                          double* effort_ptr, double* position_command_ptr, double* velocity_command_ptr,
-                          double* effort_command_ptr);
+                          double* effort_ptr, double* control_mode_ptr, double* position_command_ptr,
+                          double* velocity_command_ptr, double* effort_command_ptr);
 
   void enforce(const rclcpp::Duration& period);
 
@@ -25,6 +26,7 @@ class RcfJointLimits {
   double* position_ptr_ = nullptr;
   double* velocity_ptr_ = nullptr;
   double* effort_ptr_ = nullptr;
+  double* control_mode_ptr_ = nullptr;
   double* position_command_ptr_ = nullptr;
   double* velocity_command_ptr_ = nullptr;
   double* effort_command_ptr_ = nullptr;

@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_definitions(-Wall -Werror -Wno-enum-compare)
 
-set(THIS_PACKAGE_INCLUDE_DEPENDS hardware_interface rclcpp joint_limits)
+set(THIS_PACKAGE_INCLUDE_DEPENDS hardware_interface rclcpp joint_limits rcf_hardware_interface)
 
 find_package(ament_cmake REQUIRED)
 foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
@@ -20,6 +20,7 @@ target_include_directories(
          $<INSTALL_INTERFACE:include>)
 target_link_libraries(
   ${PROJECT_NAME} PUBLIC hardware_interface::hardware_interface rclcpp::rclcpp)
+ament_target_dependencies(${PROJECT_NAME} PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS})
 
 install(DIRECTORY include/ DESTINATION include)
 install(

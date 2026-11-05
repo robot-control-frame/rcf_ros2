@@ -6,15 +6,17 @@
 #include "rcf_joint_limits_interface/rcf_joint_limits.hpp"
 
 #include <cmath>
+#include <limits>
 
 namespace rcf_joint_limits_interface {
 RcfJointLimits::RcfJointLimits(const joint_limits::JointLimits& limits, double* position_ptr, double* velocity_ptr,
-                               double* effort_ptr, double* position_command_ptr, double* velocity_command_ptr,
-                               double* effort_command_ptr)
+                               double* effort_ptr, double* control_mode_ptr, double* position_command_ptr,
+                               double* velocity_command_ptr, double* effort_command_ptr)
     : limits_(limits),
       position_ptr_(position_ptr),
       velocity_ptr_(velocity_ptr),
       effort_ptr_(effort_ptr),
+      control_mode_ptr_(control_mode_ptr),
       position_command_ptr_(position_command_ptr),
       velocity_command_ptr_(velocity_command_ptr),
       effort_command_ptr_(effort_command_ptr) {
@@ -28,6 +30,19 @@ RcfJointLimits::RcfJointLimits(const joint_limits::JointLimits& limits, double* 
 }
 
 void RcfJointLimits::enforce(const rclcpp::Duration& period) {
+  using rcf_hardware_interface::ControlMode;
+  using rcf_hardware_interface::is_control_mode_value;
+
+  const bool apply_limits = is_control_mode_value(*control_mode_ptr_, ControlMode::BEGIN) ||
+                            is_control_mode_value(*control_mode_ptr_, ControlMode::MODE_EFFORT) ||
+                            is_control_mode_value(*control_mode_ptr_, ControlMode::MODE_VELOCITY) ||
+                            is_control_mode_value(*control_mode_ptr_, ControlMode::MODE_POSITION);
+  if (!apply_limits) {
+    prev_pos_cmd_ = std::numeric_limits<double>::quiet_NaN();
+    prev_vel_cmd_ = std::numeric_limits<double>::quiet_NaN();
+    return;
+  }
+
   if (std::isnan(prev_pos_cmd_)) {
     prev_pos_cmd_ = *position_ptr_;
   }
