@@ -42,7 +42,7 @@ namespace rcf_common {
 namespace filters {
 LowPassFilter::LowPassFilter(double cutoff_freq) : delta_t_(0.0) { cutoff_frequency_ = cutoff_freq; }
 
-void LowPassFilter::input(double in, double time) {
+void LowPassFilter::input(double in, double dt) {
   // My filter reference was Julius O. Smith III, Intro. to Digital Filters
   // With Audio Applications.
   // See https://ccrma.stanford.edu/~jos/filters/Example_Second_Order_Butterworth_Lowpass.html
@@ -50,20 +50,11 @@ void LowPassFilter::input(double in, double time) {
   in_[1] = in_[0];
   in_[0] = in;
 
-  if (!(prev_time_ == 0)) {  // Not first time through the program
-
-    delta_t_ = time - prev_time_;
-    prev_time_ = time;
-
-    if (0 == delta_t_) {
-      RCLCPP_ERROR(rclcpp::get_logger("LowPassFilter"),
-                   "delta_t is 0, skipping this loop. Possible overloaded cpu at time: %f", time);
-      return;
-    }
-  } else {
-    prev_time_ = time;
+  if (dt <= 0.0) {
+    RCLCPP_ERROR(rclcpp::get_logger("LowPassFilter"), "dt is <= 0 (%f), skipping this loop.", dt);
     return;
   }
+  delta_t_ = dt;
 
   if (cutoff_frequency_ != -1 && cutoff_frequency_ > 0) {
     // Check if tan(_) is really small, could cause c = NaN

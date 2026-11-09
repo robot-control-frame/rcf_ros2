@@ -8,7 +8,6 @@
 
 #include "joint_limits/joint_limits.hpp"
 #include "rcf_hardware_interface/control_modes.hpp"
-#include "rclcpp/duration.hpp"
 namespace rcf_joint_limits_interface {
 
 class RcfJointLimits {
@@ -17,7 +16,8 @@ class RcfJointLimits {
                           double* effort_ptr, double* control_mode_ptr, double* position_command_ptr,
                           double* velocity_command_ptr, double* effort_command_ptr);
 
-  void enforce(const rclcpp::Duration& period);
+  // dt: sample period in seconds (prefer theoretical control period)
+  void enforce(double dt);
 
  private:
   double saturate(const double val, const double min_val, const double max_val);
@@ -33,7 +33,7 @@ class RcfJointLimits {
 
   double min_pos_limit_, max_pos_limit_;
   double prev_pos_cmd_ = {std::numeric_limits<double>::quiet_NaN()};
-  double prev_vel_cmd_ = {0.0};
+  double prev_vel_cmd_ = {std::numeric_limits<double>::quiet_NaN()};
 };
 
 }  // namespace rcf_joint_limits_interface

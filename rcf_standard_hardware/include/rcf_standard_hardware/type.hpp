@@ -4,6 +4,7 @@
  *******************************************************************************/
 #pragma once
 #include <cstdint>
+#include <rcf_common/filters/lp_filter.hpp>
 #include <rclcpp/time.hpp>
 namespace rcf_standard_hardware {
 
@@ -29,6 +30,7 @@ struct ActData {
   double cmd_v1{}, cmd_v2{}, cmd_v3{};
   double cmd_pos_unlimit{}, cmd_vel_unlimit{}, cmd_effort_unlimit{}, cmd_pos_keep;
   bool use_vel_filter{false};
+  std::shared_ptr<rcf_common::filters::LowPassFilter> vel_filter{nullptr};
   double temperature{};
   rclcpp::Time last_printf_jump_command_stamp{0, 0, RCL_STEADY_TIME};
   double jump_cmd_threshold{std::numeric_limits<double>::max()};
