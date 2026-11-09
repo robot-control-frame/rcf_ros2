@@ -29,12 +29,11 @@ RcfJointLimits::RcfJointLimits(const joint_limits::JointLimits& limits, double* 
   }
 }
 
-void RcfJointLimits::enforce(const rclcpp::Duration& period) {
+void RcfJointLimits::enforce(double dt) {
   using rcf_hardware_interface::ControlMode;
   using rcf_hardware_interface::is_control_mode_value;
 
-  const bool apply_limits = is_control_mode_value(*control_mode_ptr_, ControlMode::BEGIN) ||
-                            is_control_mode_value(*control_mode_ptr_, ControlMode::MODE_EFFORT) ||
+  const bool apply_limits = is_control_mode_value(*control_mode_ptr_, ControlMode::MODE_EFFORT) ||
                             is_control_mode_value(*control_mode_ptr_, ControlMode::MODE_VELOCITY) ||
                             is_control_mode_value(*control_mode_ptr_, ControlMode::MODE_POSITION);
   if (!apply_limits) {
@@ -46,38 +45,27 @@ void RcfJointLimits::enforce(const rclcpp::Duration& period) {
   if (std::isnan(prev_pos_cmd_)) {
     prev_pos_cmd_ = *position_ptr_;
   }
-
   if (std::isnan(prev_vel_cmd_)) {
     prev_vel_cmd_ = *velocity_ptr_;
   }
-  // enforce pos command
-  double min_pos, max_pos;
-  if (limits_.has_velocity_limits) {
-    const double delta_pos = limits_.max_velocity * period.seconds();
-    min_pos = std::max(prev_pos_cmd_ - delta_pos, min_pos_limit_);
-    max_pos = std::min(prev_pos_cmd_ + delta_pos, max_pos_limit_);
-  } else {
-    min_pos = min_pos_limit_;
-    max_pos = max_pos_limit_;
-  }
 
-  const double pos_cmd = saturate(*position_command_ptr_, min_pos, max_pos);
+  // enforce pos command: hard limits first, then rate-limit toward that target.
+  // Applying both in one saturate window can collapse to the hard bound in a single
+  // cycle when prev_pos_cmd_ is already outside the position limits.
+  double pos_cmd = saturate(*position_command_ptr_, min_pos_limit_, max_pos_limit_);
+  if (limits_.has_velocity_limits) {
+    const double delta_pos = limits_.max_velocity * dt;
+    pos_cmd = saturate(pos_cmd, prev_pos_cmd_ - delta_pos, prev_pos_cmd_ + delta_pos);
+  }
   *position_command_ptr_ = pos_cmd;
   prev_pos_cmd_ = pos_cmd;
 
-  // enforce vel command
-  double vel_low;
-  double vel_high;
+  // enforce vel command: hard velocity limit first, then acceleration rate-limit.
+  double vel_cmd = saturate(*velocity_command_ptr_, -limits_.max_velocity, limits_.max_velocity);
   if (limits_.has_acceleration_limits) {
-    assert(period.seconds() > 0.0);
-    const double dt = period.seconds();
-    vel_low = std::max(prev_vel_cmd_ - limits_.max_acceleration * dt, -limits_.max_velocity);
-    vel_high = std::min(prev_vel_cmd_ + limits_.max_acceleration * dt, limits_.max_velocity);
-  } else {
-    vel_low = -limits_.max_velocity;
-    vel_high = limits_.max_velocity;
+    const double delta_vel = limits_.max_acceleration * dt;
+    vel_cmd = saturate(vel_cmd, prev_vel_cmd_ - delta_vel, prev_vel_cmd_ + delta_vel);
   }
-  const double vel_cmd = saturate(*velocity_command_ptr_, vel_low, vel_high);
   *velocity_command_ptr_ = vel_cmd;
   prev_vel_cmd_ = vel_cmd;
 

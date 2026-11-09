@@ -22,6 +22,16 @@ hardware_interface::CallbackReturn RcfStandardHardware::on_init(
   if (hardware_interface::SystemInterface::on_init(params) != hardware_interface::CallbackReturn::SUCCESS) {
     return hardware_interface::CallbackReturn::ERROR;
   }
+  if (info_.rw_rate == 0) {
+    RCLCPP_ERROR(get_logger(), "rw_rate is 0, cannot compute control_period");
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+  control_period_ = 1.0 / static_cast<double>(info_.rw_rate);
+  if (control_period_ <= 0.0) {
+    RCLCPP_ERROR(get_logger(), "Invalid control_period: %.6f (rw_rate=%u)", control_period_, info_.rw_rate);
+    return hardware_interface::CallbackReturn::ERROR;
+  }
+  RCLCPP_INFO(get_logger(), "control_period: %.6f s (rw_rate=%u)", control_period_, info_.rw_rate);
   YAML::Node rcf_std_hardware_config, transmissions_config;
   try {
     transmissions_config_path_ = info_.hardware_parameters["transmissions_config_path"];
@@ -230,7 +240,12 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
       act_data->status_stamp = item.stamp;
       act_data->pos = item.position;
       act_data->pos_raw = item.position;
-      act_data->vel = item.velocity;
+      if (act_data->use_vel_filter && act_data->vel_filter) {
+        act_data->vel_filter->input(item.velocity, control_period_);
+        act_data->vel = act_data->vel_filter->output();
+      } else {
+        act_data->vel = item.velocity;
+      }
       act_data->effort = item.effort;
       act_data->cur = item.current;
       act_data->status = item.error_code;
@@ -288,11 +303,11 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
 }
 
 hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /*time*/,
-                                                           const rclcpp::Duration& period) {
+                                                           const rclcpp::Duration& /*period*/) {
   // BEGIN: This part here is for exemplary purposes - Please do not copy to your production code
 
   for (auto& joint_limits : joint_limits_) {
-    joint_limits->enforce(period);
+    joint_limits->enforce(control_period_);
   }
   for (auto& transmission : transmissions_) {
     transmission->joint_to_actuator();
@@ -377,10 +392,9 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
     driver_->set_servo_command(all_servo_cmd);
   }
 
-  actuator_state_time_since_last_publish_ += period.seconds();
+  actuator_state_time_since_last_publish_ += control_period_;
   const bool should_publish_actuator_state =
-      actuator_state_publish_rate_ <= 0.0 ||
-      actuator_state_time_since_last_publish_ >= actuator_state_publish_period_;
+      actuator_state_publish_rate_ <= 0.0 || actuator_state_time_since_last_publish_ >= actuator_state_publish_period_;
   if (should_publish_actuator_state) {
     dynamic_actuator_state_msg_.header.stamp = get_clock()->now();
     for (size_t i = 0; i < act_data_vector.size(); i++) {
@@ -429,6 +443,14 @@ bool RcfStandardHardware::setup_motors(YAML::Node& hw_config) {
         data->jump_cmd_threshold = motor_config["jump_cmd_threshold"].as<double>(0.087);
       } else {
         data->act_type = ActType::UNKNOWN;
+      }
+
+      data->use_vel_filter = motor_config["use_vel_filter"].as<bool>(false);
+      if (data->use_vel_filter) {
+        const double lp_cutoff_frequency = motor_config["lp_cutoff_frequency"].as<double>(70.0);
+        data->vel_filter = std::make_shared<rcf_common::filters::LowPassFilter>(lp_cutoff_frequency);
+        RCLCPP_INFO(get_logger(), "Actuator %s: velocity low-pass filter enabled, cutoff=%.1f Hz", name.c_str(),
+                    lp_cutoff_frequency);
       }
 
       act_data_vector.push_back(std::move(data));
@@ -643,8 +665,8 @@ bool RcfStandardHardware::setup_check_timeout(YAML::Node& hw_config) {
     RCLCPP_INFO(get_logger(),
                 "timeout_threshold: %.3f, check_timeout: %s, use_jump_command_protection: %s, "
                 "actuator_state_publish_rate: %.1f",
-                timeout_threshold_, check_timeout_ ? "true" : "false",
-                use_jump_command_protection_ ? "true" : "false", actuator_state_publish_rate_);
+                timeout_threshold_, check_timeout_ ? "true" : "false", use_jump_command_protection_ ? "true" : "false",
+                actuator_state_publish_rate_);
   } catch (const std::exception& e) {
     RCLCPP_ERROR(get_logger(), "%s", e.what());
     return false;

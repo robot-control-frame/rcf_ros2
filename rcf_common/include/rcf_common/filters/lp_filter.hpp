@@ -42,7 +42,8 @@ namespace filters {
 class LowPassFilter {
  public:
   explicit LowPassFilter(double cutoff_freq);
-  void input(double in, double time);
+  // dt: fixed sample period in seconds (e.g. 1 / control_update_rate)
+  void input(double in, double dt);
   double output();
   void reset();
 
@@ -59,8 +60,7 @@ class LowPassFilter {
   // Used to check for tan(0)==>NaN in the filter calculation
   double tan_filt_ = 1.;
 
-  double prev_time_;
-  double delta_t_;
+  double delta_t_{};
 };
 }  // namespace filters
 }  // namespace rcf_common
