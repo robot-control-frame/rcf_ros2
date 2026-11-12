@@ -323,9 +323,8 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
       if (is_control_mode_value(act_data_vector[i]->ctrl_mode, rcf_hardware_interface::ControlMode::BEGIN)) {
         if (!is_control_mode_value(act_data_vector[i]->last_ctrl_mode, rcf_hardware_interface::ControlMode::BEGIN)) {
           act_data_vector[i]->cmd_pos_keep = act_data_vector[i]->pos;
-        } else {
-          act_data_vector[i]->cmd_pos = act_data_vector[i]->cmd_pos_keep;
         }
+        act_data_vector[i]->cmd_pos = act_data_vector[i]->cmd_pos_keep;
         servo_cmd.mode = rcf_standard_driver_interface::ControlModes::BEGIN;
         act_data_vector[i]->last_ctrl_mode = act_data_vector[i]->ctrl_mode;
       } else if (is_control_mode_value(act_data_vector[i]->ctrl_mode,
