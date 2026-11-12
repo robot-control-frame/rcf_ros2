@@ -384,8 +384,8 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
       servo_cmd.position = act_data_vector[i]->cmd_pos;
       servo_cmd.velocity = act_data_vector[i]->cmd_vel;
       servo_cmd.effort = act_data_vector[i]->cmd_effort;
-      servo_cmd.v1 = static_cast<uint32_t>(std::min(65535.0, std::max(0.0, act_data_vector[i]->cmd_v1)));
-      servo_cmd.v2 = static_cast<uint32_t>(std::min(65535.0, std::max(0.0, act_data_vector[i]->cmd_v2)));
+      servo_cmd.v1 = act_data_vector[i]->cmd_v1;
+      servo_cmd.v2 = act_data_vector[i]->cmd_v2;
       all_servo_cmd.push_back(servo_cmd);
     }
 
