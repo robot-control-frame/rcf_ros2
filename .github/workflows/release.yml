@@ -1,0 +1,97 @@
+name: release
+
+# 打 tag（v0.7.0）→ 自动跑 bloom-release，把打包结果推到 rcf_ros2-release 仓。
+# 也可以在 Actions 页面手动触发（workflow_dispatch），但要先有对应的 tag。
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "要发布的版本号，如 0.7.0（tag v0.7.0 必须已经存在）"
+        required: true
+        type: string
+      new_track:
+        description: "新版本号（勾选=改 tracks.yaml）；取消勾选=只重打同一版本的包（0.6.0-2）"
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bloom-release:
+    name: bloom-release (${{ github.ref_name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: ros:jazzy
+      options: --user root
+    env:
+      RELEASE_REPO_URL: https://github.com/robot-control-frame/rcf_ros2-release.git
+      UPSTREAM_URL: https://github.com/robot-control-frame/rcf_ros2
+      REPO_NAME: rcf_ros2
+      DEVEL_BRANCH: main
+      ROS_DISTRO: jazzy
+      RELEASE_INC: "1"
+    steps:
+      - name: Checkout（含 tag，bloom 要用 v<version> 导出源码）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 解析版本号
+        id: version
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            v="${{ inputs.version }}"
+          else
+            v="${GITHUB_REF_NAME#v}"
+          fi
+          v="${v#v}"
+          echo "value=$v" >> "$GITHUB_OUTPUT"
+          echo "releasing version: $v"
+          git rev-parse "v$v" >/dev/null 2>&1 || {
+            echo "::error::tag v$v 不存在，请先 catkin_prepare_release 并 push tag"; exit 1; }
+
+      - name: 安装 bloom / rosdep / 打包工具
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            python3-bloom python3-pexpect python3-rosdep \
+            fakeroot debhelper dh-make git ca-certificates
+          rosdep init 2>/dev/null || true
+          rosdep update --rosdistro "$ROS_DISTRO"
+
+      - name: 配置 git 身份与凭据（推 release 仓需要 PAT）
+        shell: bash
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          git config --global user.name "rcf release bot"
+          git config --global user.email "liaolunjia@gmail.com"
+          git config --global credential.helper store
+          printf 'https://x-access-token:%s@github.com\n' "$RELEASE_TOKEN" > ~/.git-credentials
+          chmod 600 ~/.git-credentials
+          git config --global http.version HTTP/1.1
+
+      - name: bloom-release
+        shell: bash
+        run: |
+          extra=""
+          if [ "${{ inputs.new_track }}" = "false" ]; then extra="--no-new-track"; fi
+          python3 scripts/bloom_release.py --version "${{ steps.version.outputs.value }}" $extra
+
+      - name: 校验生成的 tag 已推到 release 仓
+        shell: bash
+        run: |
+          v="${{ steps.version.outputs.value }}"
+          git ls-remote --tags "$RELEASE_REPO_URL" | grep -q "release/$ROS_DISTRO/rcf_common/$v-1" \
+            || { echo "::error::release 仓里没有 release/$ROS_DISTRO/rcf_common/$v-1"; exit 1; }
+          echo "::notice::released $v-1. 下一步：把 rosdistro 里 rcf_ros2 的 release.version 改成 $v-1"
