@@ -19,20 +19,24 @@ permissions:
 
 jobs:
   format:
-    name: clang-format
+    name: 格式校验（C++ / Python / CMake）
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 安装 clang-format
-        # 固定大版本，避免哪天 runner 升级 clang-format 后
-        # 同一份代码突然全部“不合规范”。
+      - name: 安装格式化工具
+        # 版本全部钉死：格式化工具一升级，同一份代码可能突然“全部不合规范”。
+        # 本地也要用同样的版本，否则改完推上去还是红。
         run: |
           sudo apt-get update
           sudo apt-get install -y clang-format-18
+          pipx install ruff==0.17.4
+          pipx install gersemi==0.29.2
           clang-format-18 --version
+          ruff --version
+          gersemi --version
 
       - name: 按 .clang-format 校验所有 C++ 文件
         run: |
@@ -52,7 +56,19 @@ jobs:
             echo "  git ls-files '*.h' '*.hpp' '*.c' '*.cc' '*.cpp' '*.cxx' | xargs clang-format-18 -i"
             exit 1
           fi
-          echo "全部通过"
+          echo "C++ 检查通过"
+
+      - name: 按 .ruff.toml 校验 Python
+        run: |
+          files=$(git ls-files '*.py')
+          echo "检查 $(echo "$files" | wc -l) 个文件"
+          ruff format --check --diff $files
+
+      - name: 按 .gersemirc 校验 CMake
+        run: |
+          files=$(git ls-files 'CMakeLists.txt' '*.cmake' '*.cmake.in')
+          echo "检查 $(echo "$files" | wc -l) 个文件"
+          gersemi --check $files
 
   colcon:
     name: colcon build + test
