@@ -34,7 +34,7 @@ class ShmSwapBuffer {
     size_t shm_size;
     size_t type_size;
     size_t type_align;
-    uint64_t type_hash;  // unused since v3; kept for binary layout compatibility
+    uint64_t type_hash;                              // unused since v3; kept for binary layout compatibility
     std::atomic<bool> writer_active;                 // 防止多个发布者交错写入同一缓冲
     std::atomic<int> readable_idx;                   // 当前可读缓冲索引
     std::atomic<uint64_t> buffer_seq[kBufferCount];  // 奇数表示该缓冲正在写入
@@ -191,14 +191,14 @@ class ShmSwapBuffer {
   bool validate_metadata() const {
     bool valid = true;
     if (shm_data_->magic != kMagic || shm_data_->version != kVersion) {
-      std::cerr << "shared memory metadata mismatch: " << shm_name_ << " magic/version"
-                << " shared=(" << shm_data_->magic << "," << shm_data_->version << ")"
-                << " current=(" << kMagic << "," << kVersion << ")" << std::endl;
+      std::cerr << "shared memory metadata mismatch: " << shm_name_ << " magic/version" << " shared=("
+                << shm_data_->magic << "," << shm_data_->version << ")" << " current=(" << kMagic << "," << kVersion
+                << ")" << std::endl;
       valid = false;
     }
     if (shm_data_->shm_size != sizeof(ShmData)) {
-      std::cerr << "shared memory layout size mismatch: " << shm_name_
-                << " shared=" << shm_data_->shm_size << ", current=" << sizeof(ShmData) << std::endl;
+      std::cerr << "shared memory layout size mismatch: " << shm_name_ << " shared=" << shm_data_->shm_size
+                << ", current=" << sizeof(ShmData) << std::endl;
       valid = false;
     }
     if (shm_data_->type_size != sizeof(T)) {
