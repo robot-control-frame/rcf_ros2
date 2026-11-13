@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2026/04/23, Liao LunJia.
- * All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
  *******************************************************************************/
 
 #include "rcf_joint_limits_interface/rcf_joint_limits.hpp"

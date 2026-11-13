@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2026/04/23, Liao Lunjia.
- * All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
  *******************************************************************************/
 #pragma once
 #include <cstdint>

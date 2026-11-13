@@ -2,6 +2,11 @@
 Changelog for package rcf_common
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.1 (2026-11-13)
+------------------
+* 补充 Apache-2.0 LICENSE、统一 license 字段与 SPDX 标识、补充包描述与仓库链接、统一维护者邮箱
+* Contributors: 廖伦稼
+
 0.5.0 (2026-11-13)
 ------------------
 * 增加速度滤波器及优化限位逻辑
@@ -33,7 +38,7 @@ Changelog for package rcf_common
   * feat: add transmission parse
   * 适配新的transmission
   ---------
-  Co-authored-by: 廖伦稼 <lunjia.liao@ubtrobot.com>
+  Co-authored-by: 廖伦稼 <liaolunjia@gmail.com>
 * Contributors: 廖伦稼
 
 0.0.2 (2026-08-28 11:07)
@@ -47,5 +52,5 @@ Changelog for package rcf_common
   * 完善硬件自检逻辑
   * 适配新的control mode
   ---------
-  Co-authored-by: 廖伦稼 <lunjia.liao@ubtrobot.com>
+  Co-authored-by: 廖伦稼 <liaolunjia@gmail.com>
 * Contributors: 廖伦稼

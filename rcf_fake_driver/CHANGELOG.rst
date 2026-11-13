@@ -2,6 +2,11 @@
 Changelog for package rcf_fake_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.5.1 (2026-11-13)
+------------------
+* 补充 Apache-2.0 LICENSE、统一 license 字段与 SPDX 标识、补充包描述与仓库链接、统一维护者邮箱
+* Contributors: 廖伦稼
+
 0.5.0 (2026-11-13)
 ------------------
 
@@ -32,7 +37,7 @@ Changelog for package rcf_fake_driver
   * simple_transmission plugin ok
   * 使用通用transmission plugin
   ---------
-  Co-authored-by: 廖伦稼 <lunjia.liao@ubtrobot.com>
+  Co-authored-by: 廖伦稼 <liaolunjia@gmail.com>
 * Contributors: 廖伦稼
 
 0.0.1 (2026-08-26)
@@ -43,7 +48,7 @@ Changelog for package rcf_fake_driver
   * 完善硬件自检逻辑
   * 适配新的control mode
   ---------
-  Co-authored-by: 廖伦稼 <lunjia.liao@ubtrobot.com>
+  Co-authored-by: 廖伦稼 <liaolunjia@gmail.com>
 * Merge pull request `#1 <https://github.com/robot-control-frame/rcf_ros2/issues/1>`_ from robot-control-frame/init
   基本功能ok
 * update

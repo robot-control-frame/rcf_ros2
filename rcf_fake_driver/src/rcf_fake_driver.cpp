@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2026/04/21, Liao LunJia.
- * All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
  *******************************************************************************/
 #include <rcf_fake_driver/rcf_fake_driver.h>
 

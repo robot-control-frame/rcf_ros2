@@ -1,6 +1,6 @@
 /*******************************************************************************
  * Copyright (c) 2026/08/27, Liao LunJia.
- * All rights reserved.
+ * SPDX-License-Identifier: Apache-2.0
  *******************************************************************************/
 #include "rcf_common/transmission_parse.hpp"
 
