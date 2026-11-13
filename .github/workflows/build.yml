@@ -1,0 +1,68 @@
+name: build
+
+# 只在对 main 的 Pull Request 上跑（以及手动触发），push 不跑。
+# 目的：合并前用一台干净的机器验证 colcon build + 单元测试能过，
+# 而不是靠每个人本地环境碰运气。
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  colcon:
+    name: colcon build + test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container:
+      image: ros:jazzy-ros-base
+      options: --user root
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 安装 colcon 与 rosdep
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            python3-colcon-common-extensions python3-rosdep git ca-certificates
+          rosdep init 2>/dev/null || true
+          rosdep update --rosdistro jazzy
+
+      - name: 升级 ROS 包到最新同步版本
+        # 官方 ros:jazzy 镜像可能是几个月前的快照；代码里用到的 CMake target
+        # （如 geometry_msgs::geometry_msgs 别名）只在较新的 rosidl 里才有，
+        # build.ros.org 编译时也是拿最新 apt 版本，这里保持一致。
+        shell: bash
+        run: |
+          apt-get -y upgrade
+
+      - name: 安装依赖（只补真正缺的）
+        shell: bash
+        run: |
+          rosdep install --from-paths . --ignore-src --rosdistro jazzy -y --as-root apt:false
+
+      - name: colcon build
+        shell: bash
+        run: |
+          colcon build --symlink-install --event-handlers console_cohesion+
+
+      - name: colcon test
+        shell: bash
+        run: |
+          colcon test --event-handlers console_cohesion+ --return-code-on-test-failure
+
+      - name: 测试结果汇总
+        if: always()
+        shell: bash
+        run: |
+          colcon test-result --verbose
