@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <cstdint>
 
 namespace rcf_hardware_interface {
@@ -30,6 +31,11 @@ constexpr double to_interface_value(ControlMode mode) { return static_cast<doubl
 constexpr bool is_control_mode_value(double value, ControlMode mode) { return value == to_interface_value(mode); }
 
 inline ControlMode to_control_mode(double value) {
+  // 非整数（如 2.5）或非有限值（nan/inf）不是合法的模式值，直接判为 UNKNOWN，
+  // 避免 static_cast<int> 把它们静默截断成某个有效模式。
+  if (!std::isfinite(value) || value != std::trunc(value)) {
+    return ControlMode::UNKNOWN;
+  }
   const auto int_value = static_cast<int>(value);
   switch (int_value) {
     case -1:
