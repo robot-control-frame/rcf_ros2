@@ -2,6 +2,11 @@
 Changelog for package rcf_transmission_interface
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+0.6.0 (2026-11-13)
+------------------
+* 新增 rcf metapackage，一条命令安装整套框架（ros-jazzy-rcf 拉取全部包）
+* Contributors: 廖伦稼
+
 0.5.1 (2026-11-13)
 ------------------
 * 补充 Apache-2.0 LICENSE、统一 license 字段与 SPDX 标识、补充包描述与仓库链接、统一维护者邮箱
