@@ -31,9 +31,8 @@ foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
 endforeach()
 
 # COMPILE
-add_library(rcf_standard_hardware SHARED
-  src/rcf_standard_hardware.cpp
-  src/topic_imu_hardware.cpp)
+add_library(rcf_standard_hardware SHARED src/rcf_standard_hardware.cpp
+                                         src/topic_imu_hardware.cpp)
 target_link_libraries(
   ${PROJECT_NAME}
   PUBLIC rclcpp::rclcpp yaml-cpp::yaml-cpp realtime_tools::realtime_tools
