@@ -2,8 +2,8 @@
 Changelog for package rcf_joint_limits_interface
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.5.0 (2026-11-13)
+------------------
 * 增加速度滤波器及优化限位逻辑
 * Contributors: 廖伦稼
 

@@ -2,8 +2,8 @@
 Changelog for package rcf_standard_hardware
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.5.0 (2026-11-13)
+------------------
 * 增加v3
 * fix: 修复BEGIN模式第一帧位置指令
 * fix: 修复pd参数类型
