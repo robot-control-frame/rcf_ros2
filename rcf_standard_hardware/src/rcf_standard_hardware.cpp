@@ -385,6 +385,7 @@ hardware_interface::return_type RcfStandardHardware::write(const rclcpp::Time& /
       servo_cmd.effort = act_data_vector[i]->cmd_effort;
       servo_cmd.v1 = act_data_vector[i]->cmd_v1;
       servo_cmd.v2 = act_data_vector[i]->cmd_v2;
+      servo_cmd.v3 = act_data_vector[i]->cmd_v3;
       all_servo_cmd.push_back(servo_cmd);
     }
 
