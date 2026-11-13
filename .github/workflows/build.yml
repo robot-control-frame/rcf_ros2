@@ -1,7 +1,7 @@
 name: build
 
 # 只在对 main 的 Pull Request 上跑（以及手动触发），push 不跑。
-# 目的：合并前用一台干净的机器验证 colcon build + 单元测试能过，
+# 目的：合并前用一台干净的机器验证格式、colcon build 和单元测试能过，
 # 而不是靠每个人本地环境碰运气。
 
 on:
@@ -18,6 +18,42 @@ permissions:
   contents: read
 
 jobs:
+  format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 安装 clang-format
+        # 固定大版本，避免哪天 runner 升级 clang-format 后
+        # 同一份代码突然全部“不合规范”。
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format-18
+          clang-format-18 --version
+
+      - name: 按 .clang-format 校验所有 C++ 文件
+        run: |
+          files=$(git ls-files '*.h' '*.hpp' '*.c' '*.cc' '*.cpp' '*.cxx')
+          echo "检查 $(echo "$files" | wc -l) 个文件"
+          bad=""
+          for f in $files; do
+            if ! clang-format-18 --dry-run --Werror "$f"; then
+              bad="$bad $f"
+            fi
+          done
+          if [ -n "$bad" ]; then
+            echo ""
+            echo "::error::以下文件不符合 .clang-format:$bad"
+            echo ""
+            echo "本地修复（需要 clang-format 18）："
+            echo "  git ls-files '*.h' '*.hpp' '*.c' '*.cc' '*.cpp' '*.cxx' | xargs clang-format-18 -i"
+            exit 1
+          fi
+          echo "全部通过"
+
   colcon:
     name: colcon build + test
     runs-on: ubuntu-24.04
