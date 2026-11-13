@@ -87,18 +87,24 @@ jobs:
         run: |
           rosdep install --from-paths . --ignore-src --rosdistro jazzy -y --as-root apt:false
 
+      # GitHub 启动 container 作业时会覆盖 entrypoint（--entrypoint tail -f /dev/null），
+      # 镜像自带的 /ros_entrypoint.sh 不会执行，所以每个需要 ROS 环境的 step
+      # 都要自己 source 一次，否则 cmake 找不到 ament_cmake。
       - name: colcon build
         shell: bash
         run: |
+          source /opt/ros/jazzy/setup.bash
           colcon build --symlink-install --event-handlers console_cohesion+
 
       - name: colcon test
         shell: bash
         run: |
+          source /opt/ros/jazzy/setup.bash
           colcon test --event-handlers console_cohesion+ --return-code-on-test-failure
 
       - name: 测试结果汇总
         if: always()
         shell: bash
         run: |
+          source /opt/ros/jazzy/setup.bash
           colcon test-result --verbose
