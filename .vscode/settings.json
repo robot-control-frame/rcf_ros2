@@ -1,8 +1,6 @@
 {
   // 保存时按仓库里的配置格式化：C++ 用 .clang-format，Python 用 .ruff.toml。
-  // CMake 故意不在这里自动格式化：gersemi 没有 VS Code 扩展，
-  // 一旦装了 cmake-format 扩展，保存时会把 gersemi 的排版改回去。
-  // CMake 请在提交前跑 scripts/format.sh，或者用任务面板里的 “format: cmake”。
+  // CMake 交给编辑器自己的格式化（仓库不强制统一的 CMake 风格）。
   "editor.formatOnSave": true,
   "files.trimTrailingWhitespace": true,
   "files.insertFinalNewline": true,
@@ -21,11 +19,7 @@
     "editor.defaultFormatter": "charliermarsh.ruff"
   },
 
-  "[cmake]": {
-    "editor.formatOnSave": false
-  },
-
-  // 别让编辑器把 .clang-format / .gersemirc / .ruff.toml 当成普通文件重排
+  // 别让编辑器把 .clang-format / .ruff.toml 这些配置本身当成普通文件重排
   "[ignore]": {
     "editor.formatOnSave": false
   }

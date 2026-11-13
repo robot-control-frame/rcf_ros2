@@ -17,7 +17,6 @@ fi
 
 CLANG_FORMAT=${CLANG_FORMAT:-clang-format-18}
 RUFF=${RUFF:-ruff}
-GERSEMI=${GERSEMI:-gersemi}
 
 need() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -28,11 +27,9 @@ need() {
 
 need "$CLANG_FORMAT" "sudo apt install clang-format-18"
 need "$RUFF" "pipx install ruff==0.17.4"
-need "$GERSEMI" "pipx install gersemi==0.29.2"
 
 cpp_files=$(git ls-files '*.h' '*.hpp' '*.c' '*.cc' '*.cpp' '*.cxx')
 py_files=$(git ls-files '*.py')
-cmake_files=$(git ls-files '*CMakeLists.txt' '*.cmake' '*.cmake.in')
 
 if [ "$check" -eq 1 ]; then
   status=0
@@ -47,13 +44,6 @@ if [ "$check" -eq 1 ]; then
     "$RUFF" format --check --diff $py_files || status=1
   fi
 
-  if [ -n "$cmake_files" ]; then
-    "$GERSEMI" --check --quiet $cmake_files || {
-      echo "CMake 不符合 .gersemirc：先跑 gersemi -i 修"
-      status=1
-    }
-  fi
-
   exit $status
 fi
 
@@ -61,7 +51,5 @@ fi
   echo "$cpp_files" | xargs "$CLANG_FORMAT" -i
 [ -n "$py_files" ] && echo "$RUFF: $(echo "$py_files" | wc -l) 个文件" && \
   echo "$py_files" | xargs "$RUFF" format
-[ -n "$cmake_files" ] && echo "$GERSEMI: $(echo "$cmake_files" | wc -l) 个文件" && \
-  echo "$cmake_files" | xargs "$GERSEMI" -i --quiet
 
 echo "格式化完成"

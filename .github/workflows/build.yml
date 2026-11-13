@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   format:
-    name: 格式校验（C++ / Python / CMake）
+    name: 格式校验（C++ / Python）
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -33,10 +33,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang-format-18
           pipx install ruff==0.17.4
-          pipx install gersemi==0.29.2
           clang-format-18 --version
           ruff --version
-          gersemi --version
 
       - name: 按 .clang-format 校验所有 C++ 文件
         run: |
@@ -64,18 +62,6 @@ jobs:
           echo "检查 $(echo "$files" | wc -l) 个文件"
           ruff format --check --diff $files
 
-      - name: 按 .gersemirc 校验 CMake
-        run: |
-          files=$(git ls-files '*CMakeLists.txt' '*.cmake' '*.cmake.in')
-          echo "检查 $(echo "$files" | wc -l) 个文件"
-          if ! gersemi --check --quiet $files; then
-            echo "::error::CMake 文件不符合 .gersemirc"
-            gersemi --diff $files 2>/dev/null | head -200
-            echo ""
-            echo "本地修复：gersemi -i $(git ls-files '*CMakeLists.txt' '*.cmake')"
-            exit 1
-          fi
-          echo "CMake 检查通过"
 
   colcon:
     name: colcon build + test

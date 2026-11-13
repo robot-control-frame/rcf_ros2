@@ -7,24 +7,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_definitions(-Wall -Werror -Wno-enum-compare)
 
 # find dependencies
-set(
-  THIS_PACKAGE_INCLUDE_DEPENDS
-  hardware_interface
-  pluginlib
-  rclcpp
-  rclcpp_lifecycle
-  rcf_hardware_interface
-  rcf_standard_driver_interface
-  rcf_joint_limits_interface
-  transmission_interface
-  rcf_transmission_interface
-  yaml-cpp
-  realtime_tools
-  control_msgs
-  std_srvs
-  sensor_msgs
-  rcf_common
-)
+set(THIS_PACKAGE_INCLUDE_DEPENDS
+    hardware_interface
+    pluginlib
+    rclcpp
+    rclcpp_lifecycle
+    rcf_hardware_interface
+    rcf_standard_driver_interface
+    rcf_joint_limits_interface
+    transmission_interface
+    rcf_transmission_interface
+    yaml-cpp
+    realtime_tools
+    control_msgs
+    std_srvs
+    sensor_msgs
+    rcf_common)
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -33,22 +31,19 @@ foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
 endforeach()
 
 # COMPILE
-add_library(rcf_standard_hardware SHARED src/rcf_standard_hardware.cpp src/topic_imu_hardware.cpp)
+add_library(rcf_standard_hardware SHARED
+  src/rcf_standard_hardware.cpp
+  src/topic_imu_hardware.cpp)
 target_link_libraries(
   ${PROJECT_NAME}
-  PUBLIC
-    rclcpp::rclcpp
-    yaml-cpp::yaml-cpp
-    realtime_tools::realtime_tools
-    rcf_joint_limits_interface::rcf_joint_limits_interface
-)
+  PUBLIC rclcpp::rclcpp yaml-cpp::yaml-cpp realtime_tools::realtime_tools
+         rcf_joint_limits_interface::rcf_joint_limits_interface)
 target_include_directories(
   rcf_standard_hardware
-  PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include/rcf_standard_hardware>
-)
+  PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+         $<INSTALL_INTERFACE:include/rcf_standard_hardware>)
 ament_target_dependencies(rcf_standard_hardware PUBLIC
-                          ${THIS_PACKAGE_INCLUDE_DEPENDS}
-)
+                          ${THIS_PACKAGE_INCLUDE_DEPENDS})
 
 # Export hardware plugins
 pluginlib_export_plugin_description_file(hardware_interface plugins.xml)
@@ -66,8 +61,7 @@ install(
   EXPORT export_${PROJECT_NAME}
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
-)
+  RUNTIME DESTINATION bin)
 install(TARGETS servo_enable DESTINATION lib/${PROJECT_NAME})
 install(TARGETS servo_disable DESTINATION lib/${PROJECT_NAME})
 
