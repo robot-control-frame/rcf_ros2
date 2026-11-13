@@ -74,8 +74,10 @@ def main() -> int:
 
     cmd = [
         "bloom-release",
-        "--rosdistro", distro,
-        "--track", distro,
+        "--rosdistro",
+        distro,
+        "--track",
+        distro,
         name,
     ]
     if not args.no_new_track:
@@ -96,7 +98,11 @@ def main() -> int:
 
 def run_once(cmd: list[str], answers: list[tuple[str, str]]) -> int:
     child = pexpect.spawn(
-        cmd[0], cmd[1:], timeout=300, encoding="utf-8", codec_errors="replace",
+        cmd[0],
+        cmd[1:],
+        timeout=300,
+        encoding="utf-8",
+        codec_errors="replace",
         env=os.environ,
     )
     header = ""
