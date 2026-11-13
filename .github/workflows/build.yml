@@ -66,9 +66,16 @@ jobs:
 
       - name: 按 .gersemirc 校验 CMake
         run: |
-          files=$(git ls-files 'CMakeLists.txt' '*.cmake' '*.cmake.in')
+          files=$(git ls-files '*CMakeLists.txt' '*.cmake' '*.cmake.in')
           echo "检查 $(echo "$files" | wc -l) 个文件"
-          gersemi --check $files
+          if ! gersemi --check --quiet $files; then
+            echo "::error::CMake 文件不符合 .gersemirc"
+            gersemi --diff $files 2>/dev/null | head -200
+            echo ""
+            echo "本地修复：gersemi -i $(git ls-files '*CMakeLists.txt' '*.cmake')"
+            exit 1
+          fi
+          echo "CMake 检查通过"
 
   colcon:
     name: colcon build + test

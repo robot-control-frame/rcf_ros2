@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "ms-vscode.cpptools",
+    "charliermarsh.ruff"
+  ],
+  // 这个扩展保存 CMakeLists.txt 时会按 cmake-format 的风格重排，
+  // 跟 CI 用的 gersemi 不是同一个工具，会把格式改回旧样式，建议卸载。
+  "unwantedRecommendations": [
+    "cheshirekow.cmake-format"
+  ]
+}

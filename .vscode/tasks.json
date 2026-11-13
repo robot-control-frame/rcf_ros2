@@ -1,0 +1,28 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "format: 全部",
+      "type": "shell",
+      "command": "./scripts/format.sh",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "clear": true }
+    },
+    {
+      "label": "format: 检查（不改文件）",
+      "type": "shell",
+      "command": "./scripts/format.sh --check",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "clear": true }
+    },
+    {
+      // CMake 不在保存时自动格式化，用这个任务手动跑（Ctrl+Shift+B 或
+      // Ctrl+Shift+P → Run Task）。
+      "label": "format: cmake（gersemi）",
+      "type": "shell",
+      "command": "gersemi -i $(git ls-files 'CMakeLists.txt' '*.cmake')",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "clear": true }
+    }
+  ]
+}

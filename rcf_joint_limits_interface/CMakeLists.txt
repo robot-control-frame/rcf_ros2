@@ -16,11 +16,12 @@ endforeach()
 add_library(${PROJECT_NAME} SHARED src/rcf_joint_limits.cpp)
 target_include_directories(
   ${PROJECT_NAME}
-  PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-         $<INSTALL_INTERFACE:include>)
-target_link_libraries(
-  ${PROJECT_NAME} PUBLIC hardware_interface::hardware_interface rclcpp::rclcpp)
-ament_target_dependencies(${PROJECT_NAME} PUBLIC ${THIS_PACKAGE_INCLUDE_DEPENDS})
+  PUBLIC $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include> $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(${PROJECT_NAME} PUBLIC hardware_interface::hardware_interface rclcpp::rclcpp)
+ament_target_dependencies(${PROJECT_NAME} PUBLIC
+                          ${THIS_PACKAGE_INCLUDE_DEPENDS}
+)
 
 install(DIRECTORY include/ DESTINATION include)
 install(
@@ -28,7 +29,8 @@ install(
   EXPORT export_${PROJECT_NAME}
   RUNTIME DESTINATION bin
   ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib)
+  LIBRARY DESTINATION lib
+)
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_dependencies(${THIS_PACKAGE_INCLUDE_DEPENDS})
 ament_package()
