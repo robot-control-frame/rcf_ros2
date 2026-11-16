@@ -265,9 +265,19 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
     if (servo_init_) {
       joint->control_mode = rcf_hardware_interface::to_interface_value(rcf_hardware_interface::ControlMode::BEGIN);
       joint->position_command = joint->position;
+      joint->velocity_command = 0.0;
+      joint->effort_command = 0.0;
+      joint->v1 = 0.0;
+      joint->v2 = 0.0;
+      joint->v3 = 0.0;
     } else {
       joint->control_mode = rcf_hardware_interface::to_interface_value(rcf_hardware_interface::ControlMode::NOMODE);
       joint->position_command = joint->position;
+      joint->velocity_command = 0.0;
+      joint->effort_command = 0.0;
+      joint->v1 = 0.0;
+      joint->v2 = 0.0;
+      joint->v3 = 0.0;
     }
   }
 
