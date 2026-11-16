@@ -2,8 +2,8 @@
 Changelog for package rcf_standard_hardware
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.0.2 (2026-11-16)
+------------------
 * Fix/joint defaule keep pos (`#14 <https://github.com/robot-control-frame/rcf_ros2/issues/14>`_)
   * 在没有控制器接管的情况下，关节默认锁位。
   * 修复没设置模式的bug

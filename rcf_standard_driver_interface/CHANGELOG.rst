@@ -2,8 +2,8 @@
 Changelog for package rcf_standard_driver_interface
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+0.0.2 (2026-11-16)
+------------------
 * Feat/rm rcf driver control modes (`#13 <https://github.com/robot-control-frame/rcf_ros2/issues/13>`_)
   * 删除驱动端冗余的control_mode
   * 优化imu超时检测逻辑
