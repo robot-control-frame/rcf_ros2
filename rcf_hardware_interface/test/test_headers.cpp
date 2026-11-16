@@ -1,7 +1,7 @@
+#include <gtest/gtest.h>
+
 #include <cmath>
 #include <limits>
-
-#include <gtest/gtest.h>
 
 #include "rcf_hardware_interface/joint_command_handle.hpp"
 #include "rcf_hardware_interface/joint_state_handle.hpp"
