@@ -259,6 +259,12 @@ hardware_interface::return_type RcfStandardHardware::read(const rclcpp::Time& ti
     transmission->actuator_to_joint();
   }
 
+  // 每周期写入锁位指令：关节指令位置默认等于当前关节反馈位置。
+  // 有控制器时，控制器在 update() 里写 cmd_position 覆盖；没有控制器时保持当前位置。
+  for (auto& joint : joint_data_vector) {
+    joint->position_command = joint->position;
+  }
+
   auto imu_states = driver_->get_imu_state();
   for (auto& item : imu_states) {
     auto iter = id2imu_index_.find(item.id);
